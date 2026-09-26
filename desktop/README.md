@@ -9,7 +9,7 @@ or feature parity with the Android app.
 ## Run
 
 Install Python 3.10+, Tk (`python3-tkinter` on Fedora, `python3-tk` on
-Debian/Ubuntu), and FFmpeg's `ffplay` (`ffmpeg` on Fedora, `ffmpeg` on
+Debian/Ubuntu), and FFmpeg's `ffplay` (`ffmpeg-free` on Fedora, `ffmpeg` on
 Debian/Ubuntu). In a terminal at the repository root:
 
 ```sh
