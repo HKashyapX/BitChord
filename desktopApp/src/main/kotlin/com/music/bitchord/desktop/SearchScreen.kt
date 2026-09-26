@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -134,7 +135,8 @@ internal fun SearchScreen(state: DesktopState) {
             if (state.audioError != null) Text(state.audioError.orEmpty(), color = Red, fontSize = 13.sp)
             if (results.isEmpty() && !state.searchLoading && state.audioError == null) Text("No matching songs found.", color = Muted, fontSize = 13.sp)
             LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 18.dp)) {
-                items(if (state.searchLoading && state.audio != null) emptyList() else results, key = { it.id }) { track ->
+                itemsIndexed(if (state.searchLoading && state.audio != null) emptyList() else results,
+                    key = { index, track -> "${index}-${track.id}" }) { _, track ->
                     DesktopTrackRow(
                         track, state, results, "Search", showLike = true,
                         onSelected = {

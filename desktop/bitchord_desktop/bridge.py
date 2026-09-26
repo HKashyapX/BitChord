@@ -14,6 +14,14 @@ from .catalog import Track, search
 from .player import Player
 
 
+def unique_tracks(tracks: list[Track]):
+    seen_ids: set[str] = set()
+    for track in tracks:
+        if track.video_id not in seen_ids:
+            seen_ids.add(track.video_id)
+            yield track
+
+
 def encode(value: str) -> str:
     return base64.b64encode(value.encode("utf-8")).decode("ascii")
 
@@ -36,7 +44,7 @@ def main() -> None:
 
     def do_search(request: str, query: str) -> None:
         try:
-            for track in search(query):
+            for track in unique_tracks(search(query)):
                 emit("TRACK", request, track.video_id, encode(track.title),
                      encode(track.artist), encode(track.album), encode(track.duration))
             emit("DONE", request)
