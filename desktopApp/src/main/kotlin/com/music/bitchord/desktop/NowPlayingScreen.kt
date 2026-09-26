@@ -154,6 +154,7 @@ private fun MainControls(state: DesktopState) {
         Slider(
             value = state.progress,
             onValueChange = state::seekTo,
+            enabled = !state.isRealTrack,
             colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Color.White, inactiveTrackColor = Color.White.copy(alpha = 0.25f)),
             modifier = Modifier.fillMaxWidth(),
         )
@@ -176,7 +177,10 @@ private fun MainControls(state: DesktopState) {
             }
         }
         Spacer(Modifier.height(18.dp))
-        Text("Preview controls · no audio output", color = Muted, fontSize = 11.sp)
+        Text(
+            state.audioError ?: if (state.isAudioLoading) "Loading audio…" else if (state.isRealTrack) "Live audio · seeking is not available yet" else "Sample track · search for a real song to play",
+            color = if (state.audioError != null) Red else Muted, fontSize = 11.sp,
+        )
     }
 }
 

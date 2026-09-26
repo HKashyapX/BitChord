@@ -32,8 +32,16 @@ internal val mockTracks = listOf(
 internal enum class Destination { HOME, SEARCH, LIKED_MUSIC, SONGS, NOW_PLAYING }
 internal enum class PlayerPane { MAIN, LYRICS, QUEUE }
 
-/** All desktop interactions use this one local session. No clock or audio engine advances it. */
+/** All desktop interactions use one local session; live audio is optional. */
 internal class DesktopState {
+    var audio by mutableStateOf<DesktopAudio?>(null)
+    var audioError by mutableStateOf<String?>(null)
+    var isAudioLoading by mutableStateOf(false)
+    var audioStreamActive by mutableStateOf(false)
+    var searchLoading by mutableStateOf(false)
+    var liveResults by mutableStateOf<List<MockTrack>?>(null)
+    val isRealTrack: Boolean get() = currentTrack?.let { it !in mockTracks } == true
+    fun setActualPlayback(playing: Boolean) { isPlaying = playing }
     var destination by mutableStateOf(Destination.HOME)
         private set
     private val backStack = mutableStateListOf<Destination>()
@@ -52,12 +60,16 @@ internal class DesktopState {
         private set
 
     val likedIds = mutableStateListOf("midnight", "less", "after", "space", "chamber")
-    val likedTracks: List<MockTrack> get() = mockTracks.filter { it.id in likedIds }
+    val knownTracks = mutableStateListOf<MockTrack>().apply { addAll(mockTracks) }
+    val likedTracks: List<MockTrack> get() = knownTracks.filter { it.id in likedIds }
+    fun rememberTracks(tracks: List<MockTrack>) {
+        tracks.forEach { track -> if (knownTracks.none { it.id == track.id }) knownTracks.add(track) }
+    }
     val recentSearches = mutableStateListOf("M83", "Beach House")
     var searchQuery by mutableStateOf("")
     val searchResults: List<MockTrack> get() {
         val term = searchQuery.trim()
-        return if (term.isBlank()) emptyList() else mockTracks.filter {
+        return if (term.isBlank()) emptyList() else liveResults ?: mockTracks.filter {
             it.title.contains(term, ignoreCase = true) ||
                 it.artist.contains(term, ignoreCase = true) ||
                 it.album.contains(term, ignoreCase = true)
@@ -82,7 +94,14 @@ internal class DesktopState {
         currentIndex = queue.indexOfFirst { it.id == track.id }.takeIf { it >= 0 } ?: 0
         playbackOrigin = origin
         progress = 0f
-        isPlaying = true
+        isPlaying = audio == null
+        if (audio != null) {
+            if (track in mockTracks) {
+                audio?.stop()
+                audioError = "Sample track: search for a real song to play audio."
+            }
+            else audio?.play(track)
+        }
         playerPane = PlayerPane.MAIN
         navigate(Destination.NOW_PLAYING)
     }
@@ -91,22 +110,44 @@ internal class DesktopState {
         if (index !in queue.indices) return
         currentIndex = index
         progress = 0f
-        isPlaying = true
+        isPlaying = audio == null
+        if (audio != null) {
+            val track = currentTrack
+            if (track != null && track !in mockTracks) audio?.play(track)
+            else {
+                audio?.stop()
+                audioError = "Sample track: search for a real song to play audio."
+            }
+        }
         playerPane = PlayerPane.MAIN
     }
 
-    fun togglePlayback() { isPlaying = !isPlaying }
+    fun togglePlayback() {
+        if (audio == null) isPlaying = !isPlaying
+        else if (isRealTrack) {
+            if (isAudioLoading) return
+            if (audioStreamActive) audio?.pause() else currentTrack?.let { audio?.play(it) }
+        }
+    }
     fun seekTo(fraction: Float) { progress = fraction.coerceIn(0f, 1f) }
     fun previous() {
         if (currentIndex > 0) currentIndex--
         progress = 0f
+        if (audio != null) restartAudio()
     }
     fun next() {
         if (currentIndex < queue.lastIndex) {
             currentIndex++
             progress = 0f
-            isPlaying = true
+            isPlaying = audio == null
+            if (audio != null) restartAudio()
         }
+    }
+
+    private fun restartAudio() {
+        val track = currentTrack
+        if (track != null && track !in mockTracks) audio?.play(track)
+        else { audio?.stop(); audioError = "Sample track: search for a real song to play audio." }
     }
 
     fun addToQueue(track: MockTrack) { queue.add(track) }

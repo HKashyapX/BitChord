@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Surface
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
@@ -58,6 +59,16 @@ fun main(args: Array<String>) = application {
                         }
                     }
                 }
+            }
+            DisposableEffect(state) {
+                if ("--offline" !in args) {
+                    runCatching {
+                        state.audio = DesktopAudio(state)
+                        if (state.currentTrack?.let { it in mockTracks } == true) state.setActualPlayback(false)
+                    }
+                        .onFailure { state.audioError = "Audio helper unavailable: ${it.message}" }
+                }
+                onDispose { state.audio?.close() }
             }
             DesktopApp(state)
         }

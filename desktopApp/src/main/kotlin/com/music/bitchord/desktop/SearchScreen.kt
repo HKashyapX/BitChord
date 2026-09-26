@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -48,6 +49,16 @@ import androidx.compose.ui.unit.sp
 internal fun SearchScreen(state: DesktopState) {
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    LaunchedEffect(state.searchQuery, state.audio) {
+        if (state.audio != null && state.searchQuery.isNotBlank()) {
+            state.searchLoading = true
+            delay(350)
+            state.audio?.search(state.searchQuery)
+        } else {
+            state.searchLoading = false
+            state.liveResults = null
+        }
+    }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 24.dp)) {
         Text("Search", fontSize = 36.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1.1).sp)
@@ -61,7 +72,7 @@ internal fun SearchScreen(state: DesktopState) {
             Spacer(Modifier.width(9.dp))
             BasicTextField(
                 value = state.searchQuery,
-                onValueChange = { state.searchQuery = it },
+                onValueChange = { state.searchQuery = it; state.liveResults = null },
                 singleLine = true,
                 textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
                 cursorBrush = SolidColor(Color.White),
@@ -74,7 +85,7 @@ internal fun SearchScreen(state: DesktopState) {
                     },
                 decorationBox = { inner ->
                     Box {
-                        if (state.searchQuery.isBlank()) Text("Artists, songs, albums", color = Muted, fontSize = 14.sp)
+                        if (state.searchQuery.isBlank()) Text("Songs or artists", color = Muted, fontSize = 14.sp)
                         inner()
                     }
                 },
@@ -118,11 +129,12 @@ internal fun SearchScreen(state: DesktopState) {
             }
         } else {
             val results = state.searchResults
-            Text(if (results.isEmpty()) "No results" else "Songs · ${results.size} results", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(if (state.searchLoading) "Searching…" else if (results.isEmpty()) "No results" else "Songs · ${results.size} results", fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
-            if (results.isEmpty()) Text("No matches in this mock catalog. Try another title or artist.", color = Muted, fontSize = 13.sp)
+            if (state.audioError != null) Text(state.audioError.orEmpty(), color = Red, fontSize = 13.sp)
+            if (results.isEmpty() && !state.searchLoading && state.audioError == null) Text("No matching songs found.", color = Muted, fontSize = 13.sp)
             LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 18.dp)) {
-                items(results, key = { it.id }) { track ->
+                items(if (state.searchLoading && state.audio != null) emptyList() else results, key = { it.id }) { track ->
                     DesktopTrackRow(
                         track, state, results, "Search", showLike = true,
                         onSelected = {
