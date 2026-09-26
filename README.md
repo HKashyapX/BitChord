@@ -19,7 +19,8 @@
 
 [**Download**](#download) · [**Features**](#features) · [**Contributing**](#contributing) · [**Support**](#support) · [**Disclaimer**](#disclaimer)
 
-An early Linux desktop preview is available in [`desktop/`](desktop/README.md).
+The UI-only Compose Desktop preview is in [`desktopApp/`](desktopApp/README.md).
+The earlier Python/Linux prototype remains available in [`desktop/`](desktop/README.md).
 
 <br/>
 
