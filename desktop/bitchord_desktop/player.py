@@ -1,6 +1,8 @@
 """Resolve a music stream and hand it to ffplay for Linux audio output."""
 
 import shutil
+import os
+import signal
 import subprocess
 import threading
 from urllib.parse import urlparse
@@ -10,9 +12,15 @@ from .catalog import Track
 
 def resolve_stream(video_id: str) -> tuple[str, dict[str, str]]:
     from yt_dlp import YoutubeDL
+    from yt_dlp.utils import DownloadError
 
-    with YoutubeDL({"format": "bestaudio/best", "quiet": True, "no_warnings": True, "noplaylist": True}) as dl:
-        info = dl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+    try:
+        with YoutubeDL({"format": "bestaudio/best", "quiet": True, "no_warnings": True,
+                        "noplaylist": True, "socket_timeout": 10,
+                        "retries": 1, "extractor_retries": 1}) as dl:
+            info = dl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+    except DownloadError as exc:
+        raise RuntimeError(f"Could not load the stream: {exc}") from exc
     if not isinstance(info, dict):
         raise RuntimeError("No playable stream was returned")
     url = info.get("url")
@@ -35,6 +43,7 @@ class Player:
         self.process: subprocess.Popen | None = None
         self._lock = threading.Lock()
         self._closed = False
+        self.paused = False
 
     def play(self, track: Track) -> None:
         if not shutil.which("ffplay"):
@@ -51,6 +60,23 @@ class Player:
             self._stop_locked()
             self.process = subprocess.Popen(command, stdin=subprocess.DEVNULL,
                                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self.paused = False
+
+    def toggle_pause(self) -> bool | None:
+        """Toggle a live ffplay process; return None if there is nothing to pause."""
+        with self._lock:
+            if not self.process or self.process.poll() is not None:
+                return None
+            try:
+                os.kill(self.process.pid, signal.SIGCONT if self.paused else signal.SIGSTOP)
+            except ProcessLookupError:
+                return None
+            self.paused = not self.paused
+            return self.paused
+
+    def exit_code(self) -> int | None:
+        with self._lock:
+            return self.process.poll() if self.process else None
 
     def stop(self) -> None:
         with self._lock:
@@ -64,7 +90,15 @@ class Player:
     def _stop_locked(self) -> None:
         process = self.process
         self.process = None
+        was_paused = self.paused
+        self.paused = False
         if process and process.poll() is None:
+            # Resume a suspended process so it can handle SIGTERM and exit.
+            if was_paused:
+                try:
+                    os.kill(process.pid, signal.SIGCONT)
+                except ProcessLookupError:
+                    pass
             process.terminate()
             try:
                 process.wait(timeout=2)
