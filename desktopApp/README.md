@@ -1,0 +1,61 @@
+# Compose Desktop UI
+
+This Compose Desktop preview uses one local session for navigation, selection,
+queue, likes, searches, and playback controls. Search and audio for **real search
+results** now use the existing Python desktop catalog/player through a local
+subprocess. No server, Docker, account, or credentials are needed. The Android
+app and Listen Together server remain separate.
+
+On Fedora, install Python 3.10+, FFmpeg with `ffplay`, and the Python package:
+
+```sh
+sudo dnf install python3 ffmpeg-free
+python3 -m venv .venv-desktop
+.venv-desktop/bin/python -m pip install -e ./desktop
+```
+
+If you already set up `.venv-desktop`, only install the package if it is missing.
+The app prefers `.venv-desktop/bin/python` and otherwise tries `python3`.
+
+Run it from the repository root:
+
+```sh
+./gradlew --configure-on-demand :desktopApp:run
+```
+
+Configure-on-demand keeps this desktop-only task independent of local Android
+SDK configuration.
+
+Open Search, type a song or artist, then select a result to hear it. Search
+requires internet. Play/pause and next/previous operate on the real results
+in the queue. The Home, Songs, and initial Liked Music tracks remain **sample
+data** and cannot be played; the player explains this when one is selected.
+Real search results advance to the next queued track when audio ends.
+Seek and progress tracking are not yet supported for real audio, so the real
+track seek control is disabled. Album art, lyrics, persistence, sign-in, and
+playback from the sample catalog are still pending. The
+underlying Python playback preview remains usable independently.
+
+For a UI-only demo without starting Python, run with `--offline`:
+
+```sh
+./gradlew --configure-on-demand :desktopApp:run --args="--offline"
+```
+
+Follow the flow from Home's Listen again shelf into Liked Music. Selecting a
+track opens Now Playing; its Lyrics and Up next buttons switch the right pane.
+The back arrow returns to the playlist. Search has recent queries and live
+local-catalog results. Selecting any result updates the same player session.
+Lyrics display a labeled unavailable state. Covers are local neutral placeholders.
+
+Keyboard: Tab and Shift+Tab move focus, Enter/Space activate focused controls,
+Alt+Left goes back, Escape leaves Now Playing, and Ctrl+F opens Search.
+
+For layout checks, use `--large` (1920×1080) or `--narrow` (900×680). The
+following optional flags open a preview state directly: `--liked`,
+`--now-playing` (which accepts `--lyrics` or `--queue`), or `--search=term`.
+For example:
+
+```sh
+./gradlew --configure-on-demand :desktopApp:run --args="--narrow --now-playing --queue"
+```

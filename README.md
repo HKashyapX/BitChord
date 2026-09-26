@@ -19,6 +19,9 @@
 
 [**Download**](#download) · [**Features**](#features) · [**Contributing**](#contributing) · [**Support**](#support) · [**Disclaimer**](#disclaimer)
 
+The UI-only Compose Desktop preview is in [`desktopApp/`](desktopApp/README.md).
+The earlier Python/Linux prototype remains available in [`desktop/`](desktop/README.md).
+
 <br/>
 
 <a href="https://trendshift.io/repositories/177639?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-177639" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/177639/daily?language=Kotlin" alt="kushagrasinghx%2FBitChord | Trendshift" width="250" height="55"/></a>
