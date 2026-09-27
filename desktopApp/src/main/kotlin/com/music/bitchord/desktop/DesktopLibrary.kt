@@ -41,7 +41,8 @@ internal class DesktopLibrary(private val path: Path) {
                 MockTrack(id, title, data.getProperty("tracks.$index.artist", ""),
                     data.getProperty("tracks.$index.album", ""),
                     data.getProperty("tracks.$index.duration", "0").toIntOrNull() ?: 0,
-                    Color(0xFF303039), Color(0xFF45404A))
+                    Color(0xFF303039), Color(0xFF45404A),
+                    data.getProperty("tracks.$index.artwork", ""))
             }
             val playlists = (0 until data.count("playlists", 200)).mapNotNull { index ->
                 val name = data.getProperty("playlists.$index.name") ?: return@mapNotNull null
@@ -69,6 +70,7 @@ internal class DesktopLibrary(private val path: Path) {
                 setProperty("tracks.$index.artist", track.artist)
                 setProperty("tracks.$index.album", track.album)
                 setProperty("tracks.$index.duration", track.durationSeconds.toString())
+                setProperty("tracks.$index.artwork", track.artworkUrl)
             }
             setProperty("liked", snapshot.likedIds.joinToString(","))
             setProperty("disliked", snapshot.dislikedIds.joinToString(","))

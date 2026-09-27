@@ -17,6 +17,7 @@ internal data class MockTrack(
     val durationSeconds: Int,
     val coverStart: Color,
     val coverEnd: Color,
+    val artworkUrl: String = "",
 )
 
 internal val mockTracks = listOf(
