@@ -76,6 +76,12 @@ fun main(args: Array<String>) = application {
                     }
                 }
             }
+            LaunchedEffect(state) {
+                while (true) {
+                    state.checkSleepTimer()
+                    delay(1000)
+                }
+            }
             DisposableEffect(state) {
                 if ("--offline" !in args) {
                     runCatching {

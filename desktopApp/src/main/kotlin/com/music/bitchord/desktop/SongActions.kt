@@ -40,6 +40,14 @@ internal fun SongActionsDialog(state: DesktopState, track: MockTrack) {
                 ActionLine("Add to queue") { state.addToQueue(track); state.closeActions() }
                 ActionLine("Open album") { state.openAlbum(track) }
                 ActionLine("Open artist") { state.openArtist(track) }
+                if (track.id == state.currentTrack?.id) {
+                    ActionLine("Sleep timer · 15 minutes") { state.setSleepTimer(15); state.closeActions() }
+                    ActionLine("Sleep timer · 30 minutes") { state.setSleepTimer(30); state.closeActions() }
+                    ActionLine("Sleep timer · 60 minutes") { state.setSleepTimer(60); state.closeActions() }
+                    if (state.sleepTimerEndsAt != null) {
+                        ActionLine("Cancel sleep timer") { state.setSleepTimer(0); state.closeActions() }
+                    }
+                }
             }
         },
         confirmButton = { TextButton(onClick = state::closeActions) { Text("Close") } },
