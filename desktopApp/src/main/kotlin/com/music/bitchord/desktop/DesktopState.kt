@@ -49,6 +49,14 @@ internal class DesktopState {
     val lyricLines = mutableStateListOf<LyricLine>()
     var lyricsLoading by mutableStateOf(false)
     var lyricsSource by mutableStateOf("")
+    var lyricsProviderDialogOpen by mutableStateOf(false)
+    val lyricsProviders = listOf("Automatic" to "auto", "BetterLyrics" to "BetterLyrics", "LRCLIB" to "LRCLIB")
+    fun chooseLyricsProvider(provider: String) {
+        val track = currentTrack ?: return
+        lyricLines.clear()
+        lyricsSource = ""
+        audio?.requestLyrics(track, provider)
+    }
     var lyricsOffsetMs by mutableIntStateOf(0)
     fun adjustLyricsOffset(deltaMs: Int) { lyricsOffsetMs = (lyricsOffsetMs + deltaMs).coerceIn(-10_000, 10_000) }
     var outputDialogOpen by mutableStateOf(false)
@@ -62,6 +70,33 @@ internal class DesktopState {
     var pipelineError by mutableStateOf<String?>(null)
     val pipelineFields = mutableStateMapOf<String, String>()
     var qualityMode by mutableStateOf("best")
+    var videoVersionActive by mutableStateOf(false)
+        private set
+    var versionSwitchLoading by mutableStateOf(false)
+    private var originalAudioTrack by mutableStateOf<MockTrack?>(null)
+    fun toggleVideoVersion() {
+        val track = currentTrack ?: return
+        if (videoVersionActive) {
+            val original = originalAudioTrack ?: return
+            val seconds = track.durationSeconds * progress
+            queue[currentIndex] = original
+            videoVersionActive = false
+            versionSwitchLoading = true
+            audio?.playAt(original, seconds)
+            statusMessage = "Returning to audio version…"
+        } else {
+            originalAudioTrack = track
+            audio?.playVideo(track)
+            statusMessage = "Finding matching music video…"
+        }
+    }
+    fun activateVideoVersion(video: MockTrack) {
+        queue[currentIndex] = video
+        rememberTracks(listOf(video))
+        videoVersionActive = true
+        versionSwitchLoading = false
+        statusMessage = "Playing video version in mpv"
+    }
     fun openPipeline() {
         pipelineDialogOpen = true
         pipelineError = null
@@ -75,7 +110,7 @@ internal class DesktopState {
         if (track in mockTracks || audio == null) return
         audio?.changeQuality(mode, track)
         qualityMode = mode
-        statusMessage = "Audio preference: ${if (mode == "best") "best available" else "standard when available"}"
+        statusMessage = "Stream preference: ${if (mode == "best") "best available" else "standard when available"}"
         pipelineDialogOpen = false
     }
     var statusMessage by mutableStateOf<String?>(null)
@@ -248,6 +283,9 @@ internal class DesktopState {
     }
 
     fun selectTrack(track: MockTrack, from: List<MockTrack>, origin: String) {
+        videoVersionActive = false
+        versionSwitchLoading = false
+        originalAudioTrack = null
         clearLyrics()
         val context = from.ifEmpty { listOf(track) }
         queue.clear()
@@ -269,6 +307,9 @@ internal class DesktopState {
 
     fun selectQueued(index: Int) {
         if (index !in queue.indices) return
+        videoVersionActive = false
+        versionSwitchLoading = false
+        originalAudioTrack = null
         clearLyrics()
         currentIndex = index
         progress = 0f

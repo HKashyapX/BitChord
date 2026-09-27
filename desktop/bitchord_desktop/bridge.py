@@ -10,10 +10,10 @@ import sys
 import threading
 import time
 
-from .catalog import Track, lookup_metadata, radio, search
+from .catalog import Track, build_radio, find_video_version, lookup_metadata, radio, search
 from .downloads import download_audio
-from .lyrics import fetch_lyrics
-from .player import Player
+from .lyrics import fetch_from_provider
+from .player import Player, resolve_video
 
 
 def unique_tracks(tracks: list[Track]):
@@ -56,11 +56,13 @@ def main() -> None:
         except Exception as exc:
             emit("ERROR", request, encode(str(exc)))
 
-    def do_lyrics(request: str, title: str, artist: str, duration: int) -> None:
+    def do_lyrics(request: str, title: str, artist: str, duration: int,
+                  album: str, provider: str) -> None:
         try:
-            for when, line in fetch_lyrics(title, artist, duration):
+            source, lines = fetch_from_provider(title, artist, duration, album, provider)
+            for when, line in lines:
                 emit("LYRIC", request, str(when), encode(line))
-            emit("LYRICS_DONE", request, "LRCLIB")
+            emit("LYRICS_DONE", request, encode(source))
         except Exception as exc:
             emit("LYRICS_ERROR", request, encode(str(exc)))
 
@@ -73,9 +75,10 @@ def main() -> None:
             # Artwork is optional; a failed lookup must not interrupt audio.
             pass
 
-    def do_radio(request: str, track_id: str) -> None:
+    def do_radio(request: str, seed: Track) -> None:
         try:
-            for track in unique_tracks(radio(track_id)):
+            candidates = list(unique_tracks(radio(seed.video_id)))
+            for track in build_radio(seed, candidates):
                 emit("RADIO_TRACK", request, track.video_id, encode(track.title),
                      encode(track.artist), encode(track.album), encode(track.duration),
                      encode(track.artwork_url))
@@ -123,6 +126,26 @@ def main() -> None:
         except Exception as exc:
             emit("ERROR", request, encode(str(exc)))
 
+    def do_video(request: str, source: Track, expected_serial: int) -> None:
+        nonlocal playback_serial
+        try:
+            video = find_video_version(source)
+            if video is None:
+                raise RuntimeError("No matching music video was found")
+            resolved = resolve_video(video.video_id)
+            with playback_lock:
+                if playback_serial != expected_serial:
+                    return
+                playback_serial += 1
+                serial = playback_serial
+            player.play(video, video=True, resolved=resolved)
+            emit("VIDEO_TRACK", request, video.video_id, encode(video.title), encode(video.artist),
+                 encode(video.album), encode(video.duration), encode(video.artwork_url))
+            emit("PLAYING", request, "seek")
+            threading.Thread(target=watch_playback, args=(request, serial), daemon=True).start()
+        except Exception as exc:
+            emit("VIDEO_ERROR", request, encode(str(exc)))
+
     try:
         for line in sys.stdin:
             fields = line.rstrip("\n").split("\t")
@@ -132,9 +155,9 @@ def main() -> None:
             try:
                 if action == "SEARCH" and len(values) == 1:
                     search_pool.submit(do_search, request, decode(values[0]))
-                elif action == "LYRICS" and len(values) == 3:
+                elif action == "LYRICS" and len(values) == 5:
                     lyrics_pool.submit(do_lyrics, request, decode(values[0]),
-                                       decode(values[1]), int(values[2]))
+                                       decode(values[1]), int(values[2]), decode(values[3]), values[4])
                 elif action == "ARTWORK_LOOKUP" and len(values) == 3:
                     track_id = values[0]
                     if not track_id or len(track_id) > 32 or not all(
@@ -142,16 +165,21 @@ def main() -> None:
                     ):
                         raise ValueError("Invalid track ID")
                     search_pool.submit(do_artwork, request, track_id, decode(values[1]), decode(values[2]))
-                elif action in {"RADIO", "DOWNLOAD"} and len(values) == 1:
+                elif action == "RADIO" and len(values) == 3:
                     track_id = values[0]
                     if not track_id or len(track_id) > 32 or not all(
                         char.isascii() and (char.isalnum() or char in "_-") for char in track_id
                     ):
                         raise ValueError("Invalid track ID")
-                    if action == "RADIO":
-                        search_pool.submit(do_radio, request, track_id)
-                    else:
-                        download_pool.submit(do_download, request, track_id)
+                    search_pool.submit(do_radio, request,
+                                       Track(track_id, decode(values[1]), decode(values[2])))
+                elif action == "DOWNLOAD" and len(values) == 1:
+                    track_id = values[0]
+                    if not track_id or len(track_id) > 32 or not all(
+                        char.isascii() and (char.isalnum() or char in "_-") for char in track_id
+                    ):
+                        raise ValueError("Invalid track ID")
+                    download_pool.submit(do_download, request, track_id)
                 elif action == "PLAY" and len(values) == 1:
                     track_id = values[0]
                     if not track_id or len(track_id) > 32 or not all(
@@ -163,6 +191,17 @@ def main() -> None:
                         serial = playback_serial
                     player.stop()
                     play_pool.submit(do_play, request, track_id, serial)
+                elif action == "VIDEO" and len(values) == 5:
+                    track_id = values[0]
+                    if not track_id or len(track_id) > 32 or not all(
+                        char.isascii() and (char.isalnum() or char in "_-") for char in track_id
+                    ):
+                        raise ValueError("Invalid track ID")
+                    with playback_lock:
+                        expected_serial = playback_serial
+                    search_pool.submit(do_video, request, Track(
+                        track_id, decode(values[1]), decode(values[2]), decode(values[3]), values[4]
+                    ), expected_serial)
                 elif action == "PAUSE":
                     paused = player.toggle_pause()
                     emit("PAUSED" if paused else "RESUMED" if paused is False else "ERROR",

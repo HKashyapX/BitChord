@@ -4,7 +4,8 @@ from unittest.mock import patch
 from unittest.mock import MagicMock
 import sys
 
-from bitchord_desktop.catalog import Track, parse_track, lookup_artwork, lookup_metadata, radio
+from bitchord_desktop.catalog import (Track, build_radio, find_video_version, lookup_artwork,
+                                      lookup_metadata, parse_track, radio, same_recording)
 
 
 class CatalogTests(unittest.TestCase):
@@ -49,6 +50,31 @@ class CatalogTests(unittest.TestCase):
     def test_rejects_invalid_id(self):
         for value in (None, "", "foo/bar", "foo?bar", "x" * 33):
             self.assertIsNone(parse_track({"videoId": value}))
+
+    def test_radio_deduplicates_audio_and_video_and_caps_other_artists(self):
+        seed = Track("seed", "Kesariya", "Arijit Singh")
+        candidates = [
+            Track("video", "Kesariya (Official Video)", "Arijit Singh, Pritam"),
+            Track("a1", "One", "Another Artist"),
+            Track("a2", "Two", "Another Artist"),
+            Track("a3", "Three", "Another Artist"),
+            Track("x", "Different Song", "Third Artist"),
+        ]
+        self.assertTrue(same_recording(seed, candidates[0]))
+        self.assertEqual([track.video_id for track in build_radio(seed, candidates)],
+                         ["a1", "a2", "x"])
+
+    def test_video_version_uses_matching_recording_instead_of_first_result(self):
+        api = MagicMock()
+        api.YTMusic.return_value.search.return_value = [
+            {"videoId": "wrong", "title": "Different", "artists": [{"name": "Artist"}],
+             "resultType": "video", "duration": "3:00"},
+            {"videoId": "right", "title": "Song (Official Video)",
+             "artists": [{"name": "Artist"}], "resultType": "video", "duration": "3:32"},
+        ]
+        with patch.dict(sys.modules, {"ytmusicapi": api}):
+            found = find_video_version(Track("audio", "Song", "Artist", duration="3:30"))
+        self.assertEqual(found.video_id, "right")
 
 
 if __name__ == "__main__":

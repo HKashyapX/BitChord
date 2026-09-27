@@ -28,6 +28,7 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
     private val pendingRadio = mutableMapOf<Int, MutableList<MockTrack>>()
     private val radioSeeds = mutableMapOf<Int, MockTrack>()
     private val downloadRequests = mutableMapOf<Int, MockTrack>()
+    private val videoRequests = mutableSetOf<Int>()
 
     init {
         Thread({
@@ -77,7 +78,7 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
         pendingLyrics.clear()
         pendingLyrics[id] = mutableListOf()
         send("PLAY", id.toString(), track.id)
-        send("LYRICS", id.toString(), encode(track.title), encode(track.artist), track.durationSeconds.toString())
+        requestLyrics(track, "auto", id)
         send("ARTWORK_LOOKUP", id.toString(), track.id, encode(track.title), encode(track.artist))
     }
 
@@ -86,6 +87,12 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
     fun queryOutputs() = send("OUTPUTS", playbackId.toString())
     fun setVolume(value: Float) = send("VOLUME", playbackId.toString(), value.toString())
     fun selectOutput(name: String) = send("OUTPUT_SELECT", playbackId.toString(), encode(name))
+    fun requestLyrics(track: MockTrack, provider: String = "auto", id: Int = playbackId) {
+        pendingLyrics[id] = mutableListOf()
+        state.lyricsLoading = true
+        send("LYRICS", id.toString(), encode(track.title), encode(track.artist),
+            track.durationSeconds.toString(), encode(track.album), provider)
+    }
     fun queryPipeline() = send("PIPELINE", playbackId.toString())
     fun changeQuality(mode: String, track: MockTrack) {
         if (mode !in setOf("standard", "best")) return
@@ -94,12 +101,25 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
         send("QUALITY", playbackId.toString(), mode)
         if (state.audioStreamActive) play(track)
     }
+    fun playVideo(track: MockTrack) {
+        val id = ++requestId
+        videoRequests.add(id)
+        pendingQualitySeek = (track.durationSeconds * state.progress)
+            .takeIf { state.audioSeekAvailable && it > 0f }
+        state.versionSwitchLoading = true
+        send("VIDEO", id.toString(), track.id, encode(track.title), encode(track.artist),
+            encode(track.album), formatTime(track.durationSeconds))
+    }
+    fun playAt(track: MockTrack, seconds: Float) {
+        pendingQualitySeek = seconds.takeIf { it > 0f }
+        play(track)
+    }
     fun radio(track: MockTrack) {
         val id = ++requestId
         pendingRadio.clear(); radioSeeds.clear()
         pendingRadio[id] = mutableListOf()
         radioSeeds[id] = track
-        send("RADIO", id.toString(), track.id)
+        send("RADIO", id.toString(), track.id, encode(track.title), encode(track.artist))
     }
     fun download(track: MockTrack) {
         val id = ++requestId
@@ -121,6 +141,14 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
         val id = fields[1].toIntOrNull() ?: return
         when (fields[0]) {
             "TRACK" -> if (id == searchId && fields.size >= 7) pending[id]?.add(parseTrack(fields))
+            "VIDEO_TRACK" -> if (videoRequests.remove(id) && fields.size >= 7) {
+                playbackId = id
+                state.activateVideoVersion(parseTrack(fields))
+            }
+            "VIDEO_ERROR" -> if (videoRequests.remove(id)) {
+                state.versionSwitchLoading = false
+                state.statusMessage = fields.getOrNull(2)?.let(::decode)
+            }
             "RADIO_TRACK" -> if (id in pendingRadio && fields.size >= 7) pendingRadio[id]?.add(parseTrack(fields))
             "RADIO_DONE" -> {
                 val seed = radioSeeds.remove(id)
@@ -156,6 +184,7 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
             }
             "PLAYING" -> if (id == playbackId) {
                 state.isAudioLoading = false
+                state.versionSwitchLoading = false
                 state.audioStreamActive = true
                 state.audioSeekAvailable = fields.getOrNull(2) == "seek"
                 state.setActualPlayback(true)
@@ -206,8 +235,10 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
             "LYRICS_DONE" -> if (id == playbackId) {
                 state.lyricLines.clear()
                 state.lyricLines.addAll(pendingLyrics.remove(id).orEmpty())
-                state.lyricsSource = if (state.lyricLines.isEmpty()) "" else fields.getOrNull(2).orEmpty()
+                state.lyricsSource = if (state.lyricLines.isEmpty()) "" else fields.getOrNull(2)?.let(::decode).orEmpty()
                 state.lyricsLoading = false
+                if (state.lyricLines.isNotEmpty()) state.lyricsProviderDialogOpen = false
+                else state.statusMessage = "This provider did not find synchronized lyrics"
             }
             "LYRICS_ERROR" -> if (id == playbackId) {
                 pendingLyrics.remove(id)
