@@ -12,6 +12,7 @@ import time
 from urllib.parse import urlparse
 
 from .catalog import Track
+from .downloads import saved_audio
 
 
 def resolve_stream(video_id: str) -> tuple[str, dict[str, str]]:
@@ -59,7 +60,11 @@ class Player:
         backend = "mpv" if shutil.which("mpv") else "ffplay"
         if not shutil.which(backend):
             raise RuntimeError("Install mpv (recommended) or ffplay with your Linux package manager.")
-        url, headers = resolve_stream(track.video_id)
+        local = saved_audio(track.video_id)
+        if local is not None:
+            url, headers = str(local), {}
+        else:
+            url, headers = resolve_stream(track.video_id)
         with self._lock:
             if self._closed:
                 return

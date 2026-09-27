@@ -10,7 +10,8 @@ import sys
 import threading
 import time
 
-from .catalog import Track, lookup_artwork, search
+from .catalog import Track, lookup_artwork, radio, search
+from .downloads import download_audio
 from .lyrics import fetch_lyrics
 from .player import Player
 
@@ -36,6 +37,7 @@ def main() -> None:
     output_lock = threading.Lock()
     search_pool = ThreadPoolExecutor(max_workers=2)
     lyrics_pool = ThreadPoolExecutor(max_workers=2)
+    download_pool = ThreadPoolExecutor(max_workers=1)
     play_pool = ThreadPoolExecutor(max_workers=1)
     playback_lock = threading.Lock()
     playback_serial = 0
@@ -70,6 +72,23 @@ def main() -> None:
         except Exception:
             # Artwork is optional; a failed lookup must not interrupt audio.
             pass
+
+    def do_radio(request: str, track_id: str) -> None:
+        try:
+            for track in unique_tracks(radio(track_id)):
+                emit("RADIO_TRACK", request, track.video_id, encode(track.title),
+                     encode(track.artist), encode(track.album), encode(track.duration),
+                     encode(track.artwork_url))
+            emit("RADIO_DONE", request)
+        except Exception as exc:
+            emit("RADIO_ERROR", request, encode(str(exc)))
+
+    def do_download(request: str, track_id: str) -> None:
+        try:
+            path = download_audio(track_id)
+            emit("DOWNLOAD_DONE", request, track_id, encode(str(path)))
+        except Exception as exc:
+            emit("DOWNLOAD_ERROR", request, track_id, encode(str(exc)))
 
     def watch_playback(request: str, serial: int) -> None:
         try:
@@ -123,6 +142,16 @@ def main() -> None:
                     ):
                         raise ValueError("Invalid track ID")
                     search_pool.submit(do_artwork, request, track_id, decode(values[1]), decode(values[2]))
+                elif action in {"RADIO", "DOWNLOAD"} and len(values) == 1:
+                    track_id = values[0]
+                    if not track_id or len(track_id) > 32 or not all(
+                        char.isascii() and (char.isalnum() or char in "_-") for char in track_id
+                    ):
+                        raise ValueError("Invalid track ID")
+                    if action == "RADIO":
+                        search_pool.submit(do_radio, request, track_id)
+                    else:
+                        download_pool.submit(do_download, request, track_id)
                 elif action == "PLAY" and len(values) == 1:
                     track_id = values[0]
                     if not track_id or len(track_id) > 32 or not all(
@@ -181,6 +210,7 @@ def main() -> None:
         player.close()
         search_pool.shutdown(wait=False, cancel_futures=True)
         lyrics_pool.shutdown(wait=False, cancel_futures=True)
+        download_pool.shutdown(wait=False, cancel_futures=True)
         play_pool.shutdown(wait=False, cancel_futures=True)
 
 

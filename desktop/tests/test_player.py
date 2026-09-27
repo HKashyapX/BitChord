@@ -34,6 +34,16 @@ class PlayerTests(unittest.TestCase):
         self.assertTrue(player.supports_seek)
         player.stop()
 
+    @patch("bitchord_desktop.player.subprocess.Popen")
+    @patch("bitchord_desktop.player.resolve_stream")
+    @patch("bitchord_desktop.player.saved_audio", return_value=__import__("pathlib").Path("/tmp/song.webm"))
+    @patch("bitchord_desktop.player.shutil.which", side_effect=lambda name: None if name == "mpv" else "/usr/bin/ffplay")
+    def test_plays_saved_audio_without_network_resolution(self, _which, _saved, resolve, popen):
+        player = Player()
+        player.play(Track("abc", "Song", "Artist"))
+        self.assertEqual(popen.call_args.args[0][-1], "/tmp/song.webm")
+        resolve.assert_not_called()
+
     def test_stops_live_process(self):
         player = Player()
         player.process = MagicMock()

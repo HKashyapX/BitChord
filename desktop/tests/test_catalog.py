@@ -1,8 +1,10 @@
 import unittest
 
 from unittest.mock import patch
+from unittest.mock import MagicMock
+import sys
 
-from bitchord_desktop.catalog import Track, parse_track, lookup_artwork
+from bitchord_desktop.catalog import Track, parse_track, lookup_artwork, radio
 
 
 class CatalogTests(unittest.TestCase):
@@ -32,6 +34,15 @@ class CatalogTests(unittest.TestCase):
         search.return_value = [Track("other", "Song", "Artist", artwork_url="https://i.ytimg.com/wrong.jpg"),
                                Track("right", "Song", "Artist", artwork_url="https://i.ytimg.com/right.jpg")]
         self.assertEqual(lookup_artwork("right", "Song", "Artist"), "https://i.ytimg.com/right.jpg")
+
+    def test_radio_parses_watch_playlist(self):
+        api = MagicMock()
+        api.YTMusic.return_value.get_watch_playlist.return_value = {
+            "tracks": [{"videoId": "abc", "title": "Song", "artists": [{"name": "Artist"}]}]
+        }
+        with patch.dict(sys.modules, {"ytmusicapi": api}):
+            self.assertEqual(radio("abc"), [Track("abc", "Song", "Artist")])
+        api.YTMusic.return_value.get_watch_playlist.assert_called_once_with(videoId="abc", limit=25, radio=True)
 
     def test_rejects_invalid_id(self):
         for value in (None, "", "foo/bar", "foo?bar", "x" * 33):
