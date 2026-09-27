@@ -33,7 +33,9 @@ data** and cannot be played; the player explains this when one is selected.
 
 The song actions menu offers like/dislike, play next, add to queue, add to a
 local playlist, and open album or artist detail pages for tracks seen in this
-session. Playlists and likes are session-only. The Up next panel supports
+session. Likes, playlists, known search tracks, recents, and queue state are
+stored locally at `$XDG_CONFIG_HOME/bitchord/desktop-library.properties` (or
+`~/.config/bitchord/desktop-library.properties`). The Up next panel supports
 moving and removing upcoming tracks; shuffle chooses from the remaining queue
 when advancing, and repeat cycles off → all → one. Queue actions are shared
 between Now Playing and the browsing sidebar.

@@ -46,7 +46,7 @@ internal fun PlaylistsScreen(state: DesktopState) {
     var newName by remember { mutableStateOf("") }
     Column(Modifier.fillMaxSize().padding(28.dp)) {
         Text("Playlists", fontSize = 34.sp, fontWeight = FontWeight.Bold)
-        Text("Local desktop playlists · saved for this session", color = Muted, fontSize = 12.sp)
+        Text("Local desktop playlists · saved on this device", color = Muted, fontSize = 12.sp)
         Spacer(Modifier.height(18.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(newName, { newName = it }, label = { Text("New playlist name") },
