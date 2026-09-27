@@ -81,6 +81,9 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
 
     fun pause() = send("PAUSE", playbackId.toString())
     fun seek(seconds: Float) = send("SEEK", playbackId.toString(), seconds.toString())
+    fun queryOutputs() = send("OUTPUTS", playbackId.toString())
+    fun setVolume(value: Float) = send("VOLUME", playbackId.toString(), value.toString())
+    fun selectOutput(name: String) = send("OUTPUT_SELECT", playbackId.toString(), encode(name))
     fun stop() {
         playbackId = ++requestId
         state.audioStreamActive = false
@@ -114,6 +117,20 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
                 state.setActualPlayback(true)
             }
             "POSITION" -> if (id == playbackId) fields.getOrNull(2)?.toFloatOrNull()?.let(state::updatePosition)
+            "OUTPUT" -> if (id == playbackId && fields.size >= 4) {
+                state.outputDevices.add(OutputDevice(decode(fields[2]), decode(fields[3])))
+            }
+            "OUTPUT_DONE" -> if (id == playbackId) {
+                state.outputSelected = fields.getOrNull(2)?.let(::decode).orEmpty()
+                state.outputVolume = fields.getOrNull(3)?.toFloatOrNull() ?: 100f
+                state.outputLoading = false
+            }
+            "OUTPUT_SELECTED" -> if (id == playbackId) state.outputSelected = fields.getOrNull(2)?.let(::decode).orEmpty()
+            "VOLUME_SET" -> if (id == playbackId) state.outputVolume = fields.getOrNull(2)?.toFloatOrNull() ?: state.outputVolume
+            "OUTPUT_ERROR" -> if (id == playbackId) {
+                state.outputLoading = false
+                state.outputError = fields.getOrNull(2)?.let(::decode)
+            }
             "ARTWORK" -> if (id == playbackId) {
                 val track = state.currentTrack
                 val url = fields.getOrNull(2)?.let(::decode).orEmpty()

@@ -40,6 +40,10 @@ internal fun SongActionsDialog(state: DesktopState, track: MockTrack) {
                 ActionLine("Add to queue") { state.addToQueue(track); state.closeActions() }
                 ActionLine("Open album") { state.openAlbum(track) }
                 ActionLine("Open artist") { state.openArtist(track) }
+                if (track.id !in mockTracks.map { it.id }) {
+                    ActionLine("Share link") { state.copyShareLink(track); state.closeActions() }
+                }
+                ActionLine("Copy playback log") { state.copyPlaybackLog(track); state.closeActions() }
                 if (track.id == state.currentTrack?.id) {
                     ActionLine("Sleep timer · 15 minutes") { state.setSleepTimer(15); state.closeActions() }
                     ActionLine("Sleep timer · 30 minutes") { state.setSleepTimer(30); state.closeActions() }

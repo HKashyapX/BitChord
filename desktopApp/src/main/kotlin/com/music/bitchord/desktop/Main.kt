@@ -144,5 +144,6 @@ private fun DesktopApp(state: DesktopState) {
         }
         state.actionTrack?.let { SongActionsDialog(state, it) }
         state.playlistPickerTrack?.let { PlaylistPickerDialog(state, it) }
+        if (state.outputDialogOpen) AudioOutputDialog(state)
     }
 }

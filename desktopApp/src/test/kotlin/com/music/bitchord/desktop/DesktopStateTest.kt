@@ -8,6 +8,14 @@ import androidx.compose.ui.graphics.Color
 
 class DesktopStateTest {
     @Test
+    fun lyricsOffsetIsBounded() {
+        val state = DesktopState()
+        state.adjustLyricsOffset(500)
+        assertEquals(500, state.lyricsOffsetMs)
+        state.adjustLyricsOffset(100_000)
+        assertEquals(10_000, state.lyricsOffsetMs)
+    }
+    @Test
     fun refreshedSearchTrackUpdatesOldQueueArtwork() {
         val state = DesktopState()
         val old = MockTrack("abc123", "Song", "Artist", "Album", 180,
