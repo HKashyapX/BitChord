@@ -62,6 +62,13 @@ internal fun DesktopTheme(content: @Composable () -> Unit) {
 
 private val coverCache = ConcurrentHashMap<String, ImageBitmap>()
 
+internal fun artworkCandidates(track: MockTrack?): List<String> {
+    if (track == null || mockTracks.any { it.id == track.id }) return emptyList()
+    val fallback = track.id.takeIf { it.matches(Regex("[A-Za-z0-9_-]{1,32}")) }
+        ?.let { "https://i.ytimg.com/vi/$it/hqdefault.jpg" }
+    return listOfNotNull(track.artworkUrl.takeIf { it.isNotBlank() }, fallback).distinct()
+}
+
 private fun loadCover(url: String): ImageBitmap? {
     val uri = runCatching { URI(url) }.getOrNull() ?: return null
     if (uri.scheme != "https" || uri.host !in setOf(
@@ -90,13 +97,18 @@ internal fun CoverPlaceholder(track: MockTrack?, modifier: Modifier = Modifier, 
     val shape = RoundedCornerShape(radius)
     val start = track?.coverStart ?: Color(0xFF353539)
     val end = track?.coverEnd ?: Color(0xFF4A4A4E)
-    val url = track?.artworkUrl.orEmpty()
-    val artwork by produceState<ImageBitmap?>(initialValue = coverCache[url], url) {
-        if (url.isNotBlank() && value == null) {
-            value = withContext(Dispatchers.IO) { loadCover(url) }
-            value?.let {
-                if (coverCache.size >= 128) coverCache.clear()
-                coverCache[url] = it
+    val urls = artworkCandidates(track)
+    val artwork by produceState<ImageBitmap?>(initialValue = null, urls) {
+        value = urls.firstNotNullOfOrNull(coverCache::get)
+        if (value == null) {
+            for (url in urls) {
+                val bitmap = withContext(Dispatchers.IO) { coverCache[url] ?: loadCover(url) }
+                if (bitmap != null) {
+                    if (coverCache.size >= 128) coverCache.clear()
+                    coverCache[url] = bitmap
+                    value = bitmap
+                    break
+                }
             }
         }
     }

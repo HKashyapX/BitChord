@@ -4,8 +4,23 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import androidx.compose.ui.graphics.Color
 
 class DesktopStateTest {
+    @Test
+    fun refreshedSearchTrackUpdatesOldQueueArtwork() {
+        val state = DesktopState()
+        val old = MockTrack("abc123", "Song", "Artist", "Album", 180,
+            Color.Black, Color.DarkGray)
+        state.rememberTracks(listOf(old))
+        state.selectTrack(old, listOf(old), "Search")
+        val refreshed = old.copy(artworkUrl = "https://i.ytimg.com/vi/abc123/hqdefault.jpg")
+        state.rememberTracks(listOf(refreshed))
+        assertEquals(refreshed.artworkUrl, state.currentTrack?.artworkUrl)
+        assertEquals(refreshed.artworkUrl, state.knownTracks.last().artworkUrl)
+        assertEquals(listOf(refreshed.artworkUrl), artworkCandidates(old))
+        assertEquals(emptyList(), artworkCandidates(mockTracks.first()))
+    }
     @Test
     fun sleepTimerStopsPlaybackAtDeadline() {
         val state = DesktopState()

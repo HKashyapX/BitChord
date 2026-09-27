@@ -103,7 +103,20 @@ internal class DesktopState {
     val knownTracks = mutableStateListOf<MockTrack>().apply { addAll(mockTracks) }
     val likedTracks: List<MockTrack> get() = knownTracks.filter { it.id in likedIds }
     fun rememberTracks(tracks: List<MockTrack>) {
-        tracks.forEach { track -> if (knownTracks.none { it.id == track.id }) knownTracks.add(track) }
+        tracks.forEach { track ->
+            val index = knownTracks.indexOfFirst { it.id == track.id }
+            if (index < 0) knownTracks.add(track)
+            else if (knownTracks[index].artworkUrl.isBlank() && track.artworkUrl.isNotBlank()) {
+                knownTracks[index] = track
+                queue.indices.filter { queue[it].id == track.id && queue[it].artworkUrl.isBlank() }
+                    .forEach { queue[it] = track }
+                playlists.toMap().forEach { (name, songs) ->
+                    if (songs.any { it.id == track.id }) playlists[name] = songs.map {
+                        if (it.id == track.id && it.artworkUrl.isBlank()) track else it
+                    }
+                }
+            }
+        }
     }
     fun snapshot(): LibrarySnapshot = LibrarySnapshot(
         knownTracks.filter { known -> mockTracks.none { it.id == known.id } }.toList(),
