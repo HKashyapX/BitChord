@@ -20,10 +20,12 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
         }.start()
     private val writer = process.outputStream.bufferedWriter()
     private var searchId = 0
+    private var homeId = 0
     private var playbackId = 0
     private var pendingQualitySeek: Float? = null
     private var requestId = 0
     private val pending = mutableMapOf<Int, MutableList<MockTrack>>()
+    private val pendingHome = mutableMapOf<Int, LinkedHashMap<String, MutableList<MockTrack>>>()
     private val pendingLyrics = mutableMapOf<Int, MutableList<LyricLine>>()
     private val pendingRadio = mutableMapOf<Int, MutableList<MockTrack>>()
     private val radioSeeds = mutableMapOf<Int, MockTrack>()
@@ -52,6 +54,8 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
         } catch (exc: Exception) {
             state.audioError = "Audio helper unavailable: ${exc.message}"
             state.searchLoading = false
+            state.homeLoading = false
+            if (state.homeShelves.isEmpty()) state.homeError = state.audioError
             state.isAudioLoading = false
         }
     }
@@ -64,6 +68,16 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
         state.searchLoading = true
         state.audioError = null
         send("SEARCH", id.toString(), encode(query))
+    }
+
+    fun loadHome() {
+        val id = ++requestId
+        homeId = id
+        pendingHome.clear()
+        pendingHome[id] = linkedMapOf()
+        state.homeLoading = true
+        state.homeError = null
+        send("HOME", id.toString())
     }
 
     fun play(track: MockTrack) {
@@ -141,6 +155,25 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
         val id = fields[1].toIntOrNull() ?: return
         when (fields[0]) {
             "TRACK" -> if (id == searchId && fields.size >= 7) pending[id]?.add(parseTrack(fields))
+            "HOME_TRACK" -> if (id == homeId && fields.size >= 9) {
+                val title = decode(fields[2])
+                pendingHome[id]?.getOrPut(title) { mutableListOf() }?.add(parseTrack(fields, 3))
+            }
+            "HOME_DONE" -> if (id == homeId) {
+                val shelves = pendingHome.remove(id).orEmpty().map { (title, tracks) ->
+                    HomeShelf(title, tracks.distinctBy { it.id })
+                }.filter { it.tracks.isNotEmpty() }
+                state.homeShelves.clear()
+                state.homeShelves.addAll(shelves)
+                state.rememberTracks(shelves.flatMap { it.tracks })
+                state.homeLoading = false
+                if (shelves.isEmpty()) state.homeError = "YouTube Music returned no playable home sections."
+            }
+            "HOME_ERROR" -> if (id == homeId) {
+                pendingHome.remove(id)
+                state.homeLoading = false
+                state.homeError = fields.getOrNull(2)?.let(::decode) ?: "Could not load Home."
+            }
             "VIDEO_TRACK" -> if (videoRequests.remove(id) && fields.size >= 7) {
                 playbackId = id
                 state.activateVideoVersion(parseTrack(fields))
@@ -280,10 +313,10 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
 
     private fun encode(value: String) = Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
     private fun decode(value: String) = String(Base64.getDecoder().decode(value), Charsets.UTF_8)
-    private fun parseTrack(fields: List<String>) = MockTrack(fields[2], decode(fields[3]), decode(fields[4]),
-        decode(fields[5]), parseDuration(decode(fields[6])),
+    private fun parseTrack(fields: List<String>, start: Int = 2) = MockTrack(fields[start], decode(fields[start + 1]), decode(fields[start + 2]),
+        decode(fields[start + 3]), parseDuration(decode(fields[start + 4])),
         androidx.compose.ui.graphics.Color(0xFF303039), androidx.compose.ui.graphics.Color(0xFF45404A),
-        fields.getOrNull(7)?.let(::decode).orEmpty())
+        fields.getOrNull(start + 5)?.let(::decode).orEmpty())
 }
 
 internal fun parseDuration(value: String): Int = value.split(':').mapNotNull(String::toIntOrNull)
