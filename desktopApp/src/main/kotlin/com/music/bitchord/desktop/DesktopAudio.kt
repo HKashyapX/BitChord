@@ -4,7 +4,7 @@ import java.io.File
 import java.util.Base64
 import javax.swing.SwingUtilities
 
-/** Connects the UI to the existing local Python catalog and ffplay player. */
+/** Connects the UI to the local Python catalog and audio player. */
 internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
     private val project = generateSequence(File(System.getProperty("user.dir")).absoluteFile) { it.parentFile }
         .firstOrNull { File(it, "desktop/bitchord_desktop/bridge.py").isFile }
@@ -66,13 +66,16 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
         playbackId = id
         state.audioError = null
         state.isAudioLoading = true
+        state.audioSeekAvailable = false
         send("PLAY", id.toString(), track.id)
     }
 
     fun pause() = send("PAUSE", playbackId.toString())
+    fun seek(seconds: Float) = send("SEEK", playbackId.toString(), seconds.toString())
     fun stop() {
         playbackId = ++requestId
         state.audioStreamActive = false
+        state.audioSeekAvailable = false
         state.isAudioLoading = false
         state.setActualPlayback(false)
         send("STOP", playbackId.toString())
@@ -97,12 +100,16 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
             "PLAYING" -> if (id == playbackId) {
                 state.isAudioLoading = false
                 state.audioStreamActive = true
+                state.audioSeekAvailable = fields.getOrNull(2) == "seek"
                 state.setActualPlayback(true)
             }
+            "POSITION" -> if (id == playbackId) fields.getOrNull(2)?.toFloatOrNull()?.let(state::updatePosition)
+            "SEEK_ERROR" -> if (id == playbackId) state.audioError = fields.getOrNull(2)?.let(::decode)
             "PAUSED" -> if (id == playbackId) state.setActualPlayback(false)
             "RESUMED" -> if (id == playbackId) state.setActualPlayback(true)
             "ENDED" -> if (id == playbackId) {
                 state.audioStreamActive = false
+                state.audioSeekAvailable = false
                 state.isAudioLoading = false
                 state.setActualPlayback(false)
                 state.advanceOnEnd()
@@ -110,6 +117,7 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
             "STOPPED" -> if (id == playbackId) {
                 state.setActualPlayback(false)
                 state.audioStreamActive = false
+                state.audioSeekAvailable = false
             }
             "ERROR" -> if (id == searchId && state.searchLoading) {
                 state.searchLoading = false
@@ -118,6 +126,7 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
             } else if (id == playbackId) {
                 state.isAudioLoading = false
                 state.audioStreamActive = false
+                state.audioSeekAvailable = false
                 state.setActualPlayback(false)
                 state.audioError = fields.getOrNull(2)?.let(::decode)
             }

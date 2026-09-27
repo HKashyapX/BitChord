@@ -61,8 +61,11 @@ def main() -> None:
                 code = player.exit_code()
                 if code is not None:
                     emit("ENDED" if code == 0 else "ERROR", request,
-                         "" if code == 0 else encode(f"ffplay exited with code {code}"))
+                         "" if code == 0 else encode(f"Audio player exited with code {code}"))
                     return
+                position = player.position()
+                if position is not None:
+                    emit("POSITION", request, str(position))
         except Exception as exc:
             emit("ERROR", request, encode(str(exc)))
 
@@ -76,7 +79,7 @@ def main() -> None:
                 if serial != playback_serial:
                     player.stop()
                     return
-            emit("PLAYING", request)
+            emit("PLAYING", request, "seek" if player.supports_seek else "")
             threading.Thread(target=watch_playback, args=(request, serial), daemon=True).start()
         except Exception as exc:
             emit("ERROR", request, encode(str(exc)))
@@ -105,6 +108,14 @@ def main() -> None:
                     paused = player.toggle_pause()
                     emit("PAUSED" if paused else "RESUMED" if paused is False else "ERROR",
                          request, "" if paused is not None else encode("No active audio stream"))
+                elif action == "SEEK" and len(values) == 1:
+                    try:
+                        seconds = float(values[0])
+                        if not player.seek(seconds):
+                            raise ValueError("Seeking requires mpv and an active stream")
+                        emit("POSITION", request, str(seconds))
+                    except (ValueError, RuntimeError, OSError) as exc:
+                        emit("SEEK_ERROR", request, encode(str(exc)))
                 elif action == "STOP":
                     with playback_lock:
                         playback_serial += 1

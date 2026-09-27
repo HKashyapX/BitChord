@@ -38,6 +38,11 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -136,6 +141,8 @@ private fun PlayerContent(state: DesktopState) {
 @Composable
 private fun MainControls(state: DesktopState) {
     val track = state.currentTrack ?: return
+    var dragging by remember(track.id) { mutableStateOf(false) }
+    var draggedProgress by remember(track.id) { mutableFloatStateOf(0f) }
     Column(Modifier.fillMaxWidth().widthIn(max = 530.dp)) {
         Text("PLAYING FROM ${state.playbackOrigin.uppercase()}", color = Color.White.copy(alpha = 0.62f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
         Spacer(Modifier.height(20.dp))
@@ -157,14 +164,18 @@ private fun MainControls(state: DesktopState) {
         }
         Spacer(Modifier.height(24.dp))
         Slider(
-            value = state.progress,
-            onValueChange = state::seekTo,
-            enabled = !state.isRealTrack,
+            value = if (dragging) draggedProgress else state.progress,
+            onValueChange = { draggedProgress = it; dragging = true },
+            onValueChangeFinished = {
+                if (dragging) state.seekTo(draggedProgress)
+                dragging = false
+            },
+            enabled = !state.isRealTrack || state.audioSeekAvailable,
             colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Color.White, inactiveTrackColor = Color.White.copy(alpha = 0.25f)),
             modifier = Modifier.fillMaxWidth(),
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(formatTime((track.durationSeconds * state.progress).toInt()), color = Muted, fontSize = 11.sp)
+            Text(formatTime((track.durationSeconds * (if (dragging) draggedProgress else state.progress)).toInt()), color = Muted, fontSize = 11.sp)
             Text(formatTime(track.durationSeconds), color = Muted, fontSize = 11.sp)
         }
         Spacer(Modifier.height(12.dp))
