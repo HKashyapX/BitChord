@@ -62,4 +62,60 @@ class DesktopStateTest {
         assertEquals(Destination.SEARCH, state.destination)
         assertEquals("beach", state.searchQuery)
     }
+
+    @Test
+    fun playNextReorderAndRepeatKeepQueueConsistent() {
+        val state = DesktopState()
+        val tracks = mockTracks.take(4)
+        state.selectTrack(tracks[0], tracks, "Songs")
+        state.playNext(mockTracks[7])
+        assertEquals(mockTracks[7], state.queue[1])
+        state.moveUpcoming(1, 2)
+        assertEquals(tracks[1], state.queue[1])
+        assertEquals(mockTracks[7], state.queue[2])
+        state.moveUpcoming(2, 0) // Never displace the current track.
+        assertEquals(tracks[0], state.currentTrack)
+
+        state.cycleRepeat()
+        assertEquals(RepeatMode.ALL, state.repeatMode)
+        state.selectQueued(state.queue.lastIndex)
+        state.advanceOnEnd()
+        assertEquals(tracks[0], state.currentTrack)
+        state.cycleRepeat()
+        assertEquals(RepeatMode.ONE, state.repeatMode)
+        state.advanceOnEnd()
+        assertEquals(tracks[0], state.currentTrack)
+        state.cycleRepeat()
+        assertEquals(RepeatMode.OFF, state.repeatMode)
+        state.selectQueued(state.queue.lastIndex)
+        state.advanceOnEnd()
+        assertFalse(state.isPlaying)
+    }
+
+    @Test
+    fun actionsPlaylistAndDetailsUseKnownTracks() {
+        val state = DesktopState()
+        val track = mockTracks[1]
+        state.openActions(track)
+        assertEquals(track, state.actionTrack)
+        state.openPlaylistPicker(track)
+        assertEquals(null, state.actionTrack)
+        assertTrue(state.createPlaylist("Favorites"))
+        assertFalse(state.createPlaylist("Favorites"))
+        state.addToPlaylist("Favorites", track)
+        state.addToPlaylist("Favorites", track)
+        assertEquals(listOf(track), state.playlists["Favorites"])
+        state.openPlaylist("Favorites")
+        assertEquals(Destination.PLAYLIST, state.destination)
+        state.openAlbum(track)
+        assertEquals(listOf(track, mockTracks[5]), state.detailTracks)
+        state.back()
+        assertEquals(Destination.PLAYLIST, state.destination)
+        state.openArtist(track)
+        assertEquals(listOf(track, mockTracks[5]), state.detailTracks)
+        state.toggleDislike(track)
+        assertFalse(state.isLiked(track))
+        state.toggleLike(track)
+        assertFalse(track.id in state.dislikedIds)
+    }
 }

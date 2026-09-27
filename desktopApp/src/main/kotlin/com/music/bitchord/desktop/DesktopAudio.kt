@@ -105,7 +105,7 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
                 state.audioStreamActive = false
                 state.isAudioLoading = false
                 state.setActualPlayback(false)
-                if (state.currentIndex < state.queue.lastIndex) state.next()
+                state.advanceOnEnd()
             }
             "STOPPED" -> if (id == playbackId) {
                 state.setActualPlayback(false)

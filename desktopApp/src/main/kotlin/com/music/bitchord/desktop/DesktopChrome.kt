@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SkipNext
@@ -65,6 +66,7 @@ internal fun Sidebar(state: DesktopState) {
         SidebarLabel("LIBRARY")
         SidebarItem("Liked Music", Icons.Default.Favorite, state.destination == Destination.LIKED_MUSIC) { state.navigate(Destination.LIKED_MUSIC) }
         SidebarItem("Songs", Icons.Default.LibraryMusic, state.destination == Destination.SONGS) { state.navigate(Destination.SONGS) }
+        SidebarItem("Playlists", Icons.Default.QueueMusic, state.destination == Destination.PLAYLISTS || state.destination == Destination.PLAYLIST) { state.navigate(Destination.PLAYLISTS) }
         Spacer(Modifier.weight(1f))
         Text("Desktop preview · local data", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(8.dp))
     }
@@ -98,6 +100,7 @@ internal fun QueueSidebar(state: DesktopState) {
             Text("Clear", color = Muted, fontSize = 11.sp, modifier = Modifier.focusOutline().clickable { state.clearUpcoming() }.padding(7.dp))
         }
         Text("${(state.queue.size - state.currentIndex - 1).coerceAtLeast(0)} songs", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(start = 29.dp, top = 3.dp, bottom = 13.dp))
+        QueueModeControls(state)
         val upcoming = state.queue.drop(state.currentIndex + 1)
         if (upcoming.isEmpty()) {
             Text("Nothing up next", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 22.dp))
@@ -118,6 +121,7 @@ internal fun QueueSidebar(state: DesktopState) {
                             Text(track.title, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(track.artist, color = Muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
+                        QueueMoveButtons(state, index)
                         IconButton(onClick = { state.removeUpcoming(index) }, modifier = Modifier.size(27.dp)) {
                             Icon(Icons.Default.Close, "Remove ${track.title} from queue", tint = Muted, modifier = Modifier.size(15.dp))
                         }
