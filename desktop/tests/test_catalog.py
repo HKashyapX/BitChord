@@ -9,7 +9,13 @@ class CatalogTests(unittest.TestCase):
             "videoId": "AbC_123-xyz", "title": "Song",
             "artists": [{"name": "First"}, {"name": "Second"}],
             "album": {"name": "Record"}, "duration": "3:21",
-        }), Track("AbC_123-xyz", "Song", "First, Second", "Record", "3:21"))
+            "thumbnails": [{"url": "https://i.ytimg.com/vi/abc/default.jpg"}],
+        }), Track("AbC_123-xyz", "Song", "First, Second", "Record", "3:21",
+                  "https://i.ytimg.com/vi/abc/default.jpg"))
+
+    def test_ignores_untrusted_thumbnail_host(self):
+        track = parse_track({"videoId": "abc", "thumbnails": [{"url": "https://bad.example/art"}]})
+        self.assertEqual(track.artwork_url, "")
 
     def test_rejects_invalid_id(self):
         for value in (None, "", "foo/bar", "foo?bar", "x" * 33):

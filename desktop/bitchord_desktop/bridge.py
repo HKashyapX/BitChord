@@ -46,7 +46,8 @@ def main() -> None:
         try:
             for track in unique_tracks(search(query)):
                 emit("TRACK", request, track.video_id, encode(track.title),
-                     encode(track.artist), encode(track.album), encode(track.duration))
+                     encode(track.artist), encode(track.album), encode(track.duration),
+                     encode(track.artwork_url))
             emit("DONE", request)
         except Exception as exc:
             emit("ERROR", request, encode(str(exc)))

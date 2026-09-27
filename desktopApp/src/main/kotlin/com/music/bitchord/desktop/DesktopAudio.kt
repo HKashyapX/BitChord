@@ -90,7 +90,8 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
                 pending[id]?.add(MockTrack(fields[2], decode(fields[3]), decode(fields[4]),
                     decode(fields[5]), parseDuration(decode(fields[6])),
                     androidx.compose.ui.graphics.Color(0xFF303039),
-                    androidx.compose.ui.graphics.Color(0xFF45404A)))
+                    androidx.compose.ui.graphics.Color(0xFF45404A),
+                    fields.getOrNull(7)?.let(::decode).orEmpty()))
             }
             "DONE" -> if (id == searchId) {
                 state.liveResults = pending.remove(id).orEmpty()
