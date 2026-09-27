@@ -81,6 +81,34 @@ internal class DesktopState {
     fun rememberTracks(tracks: List<MockTrack>) {
         tracks.forEach { track -> if (knownTracks.none { it.id == track.id }) knownTracks.add(track) }
     }
+    fun snapshot(): LibrarySnapshot = LibrarySnapshot(
+        knownTracks.filter { known -> mockTracks.none { it.id == known.id } }.toList(),
+        likedIds.toList(), dislikedIds.toList(), recentSearches.toList(),
+        playlists.mapValues { (_, tracks) -> tracks.map { it.id } },
+        queue.map { it.id }, currentIndex, repeatMode, shuffleEnabled,
+    )
+
+    fun restore(saved: LibrarySnapshot?) {
+        if (saved == null) return
+        rememberTracks(saved.tracks)
+        val tracksById = knownTracks.associateBy { it.id }
+        likedIds.clear(); likedIds.addAll(saved.likedIds.filter(tracksById::containsKey).distinct())
+        dislikedIds.clear(); dislikedIds.addAll(saved.dislikedIds.filter(tracksById::containsKey).distinct())
+        recentSearches.clear(); recentSearches.addAll(saved.recentSearches.take(20))
+        playlists.clear()
+        saved.playlists.forEach { (name, ids) ->
+            playlists[name] = ids.mapNotNull(tracksById::get).distinctBy { it.id }
+        }
+        if (playlists.isEmpty()) playlists["Desktop Mix"] = emptyList()
+        val restoredQueue = saved.queueIds.mapNotNull(tracksById::get)
+        if (restoredQueue.isNotEmpty()) {
+            queue.clear(); queue.addAll(restoredQueue)
+            currentIndex = saved.currentIndex.coerceIn(queue.indices)
+        }
+        repeatMode = saved.repeatMode
+        shuffleEnabled = saved.shuffleEnabled
+        isPlaying = false // Never start audio from a restored session.
+    }
     val recentSearches = mutableStateListOf("M83", "Beach House")
     var searchQuery by mutableStateOf("")
     val searchResults: List<MockTrack> get() {

@@ -13,7 +13,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -27,6 +29,10 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
 import java.awt.Dimension
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.withContext
 
 fun main(args: Array<String>) = application {
     val large = "--large" in args
@@ -42,8 +48,10 @@ fun main(args: Array<String>) = application {
     ) {
         window.minimumSize = Dimension(800, 620)
         DesktopTheme {
+            val library = remember { DesktopLibrary.default() }
             val state = remember {
                 DesktopState().apply {
+                    restore(library.load())
                     when {
                         "--now-playing" in args -> {
                             navigate(Destination.LIKED_MUSIC)
@@ -60,6 +68,14 @@ fun main(args: Array<String>) = application {
                     }
                 }
             }
+            LaunchedEffect(state) {
+                snapshotFlow { state.snapshot() }.collectLatest { snapshot ->
+                    delay(400)
+                    withContext(Dispatchers.IO) {
+                        runCatching { library.save(snapshot) }.onFailure { it.printStackTrace() }
+                    }
+                }
+            }
             DisposableEffect(state) {
                 if ("--offline" !in args) {
                     runCatching {
@@ -68,7 +84,10 @@ fun main(args: Array<String>) = application {
                     }
                         .onFailure { state.audioError = "Audio helper unavailable: ${it.message}" }
                 }
-                onDispose { state.audio?.close() }
+                onDispose {
+                    state.audio?.close()
+                    runCatching { library.save(state.snapshot()) }.onFailure { it.printStackTrace() }
+                }
             }
             DesktopApp(state)
         }
