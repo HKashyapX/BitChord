@@ -146,6 +146,30 @@ def main() -> None:
                         emit("POSITION", request, str(seconds))
                     except (ValueError, RuntimeError, OSError) as exc:
                         emit("SEEK_ERROR", request, encode(str(exc)))
+                elif action == "OUTPUTS":
+                    try:
+                        info = player.output_info()
+                        if info is None:
+                            raise ValueError("Install mpv and play a real track to select audio output")
+                        devices, selected, volume = info
+                        for name, description in devices:
+                            emit("OUTPUT", request, encode(name), encode(description))
+                        emit("OUTPUT_DONE", request, encode(selected), str(volume))
+                    except (ValueError, RuntimeError, OSError) as exc:
+                        emit("OUTPUT_ERROR", request, encode(str(exc)))
+                elif action == "VOLUME" and len(values) == 1:
+                    try:
+                        player.set_volume(float(values[0]))
+                        emit("VOLUME_SET", request, values[0])
+                    except (ValueError, RuntimeError, OSError) as exc:
+                        emit("OUTPUT_ERROR", request, encode(str(exc)))
+                elif action == "OUTPUT_SELECT" and len(values) == 1:
+                    try:
+                        device = decode(values[0])
+                        player.set_output(device)
+                        emit("OUTPUT_SELECTED", request, encode(device))
+                    except (ValueError, RuntimeError, OSError) as exc:
+                        emit("OUTPUT_ERROR", request, encode(str(exc)))
                 elif action == "STOP":
                     with playback_lock:
                         playback_serial += 1

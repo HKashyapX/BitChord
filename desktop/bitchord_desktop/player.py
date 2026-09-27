@@ -132,6 +132,32 @@ class Player:
             self._command_locked("seek", seconds, "absolute")
             return True
 
+    def output_info(self) -> tuple[list[tuple[str, str]], str, float] | None:
+        with self._lock:
+            if not self.supports_seek:
+                return None
+            devices = self._command_locked("get_property", "audio-device-list") or []
+            selected = self._command_locked("get_property", "audio-device") or "auto"
+            volume = self._command_locked("get_property", "volume")
+            return ([(item["name"], item.get("description", item["name"]))
+                     for item in devices if isinstance(item, dict) and isinstance(item.get("name"), str)][:30],
+                    str(selected), float(volume))
+
+    def set_volume(self, volume: float) -> None:
+        with self._lock:
+            if not self.supports_seek or not 0 <= volume <= 100:
+                raise ValueError("Volume control requires an active mpv stream")
+            self._command_locked("set_property", "volume", volume)
+
+    def set_output(self, device: str) -> None:
+        with self._lock:
+            if not self.supports_seek:
+                raise ValueError("Output selection requires an active mpv stream")
+            devices = self._command_locked("get_property", "audio-device-list") or []
+            if device != "auto" and device not in [item.get("name") for item in devices if isinstance(item, dict)]:
+                raise ValueError("Unknown audio output")
+            self._command_locked("set_property", "audio-device", device)
+
     def toggle_pause(self) -> bool | None:
         """Toggle a live process; return None if there is nothing to pause."""
         with self._lock:

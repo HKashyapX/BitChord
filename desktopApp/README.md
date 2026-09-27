@@ -41,6 +41,9 @@ stored locally at `$XDG_CONFIG_HOME/bitchord/desktop-library.properties` (or
 moving and removing upcoming tracks; shuffle chooses from the remaining queue
 when advancing, and repeat cycles off → all → one. Queue actions are shared
 between Now Playing and the browsing sidebar.
+Now Playing displays the album when known. Song actions can copy a share link
+or a diagnostic log, while the Lyrics pane has a line timing offset. With mpv,
+the Audio output dialog lists available devices and controls player volume.
 Real search results advance to the next queued track when audio ends. With
 `mpv`, the player reports elapsed time and supports seeking. With only `ffplay`,
 the real-track seek control stays disabled and elapsed time is unavailable.

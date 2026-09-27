@@ -8,6 +8,8 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 
 internal data class MockTrack(
     val id: String,
@@ -35,6 +37,7 @@ internal enum class Destination { HOME, SEARCH, LIKED_MUSIC, SONGS, PLAYLISTS, A
 internal enum class PlayerPane { MAIN, LYRICS, QUEUE }
 internal enum class RepeatMode { OFF, ALL, ONE }
 internal data class LyricLine(val timeMs: Int, val text: String)
+internal data class OutputDevice(val name: String, val description: String)
 
 /** All desktop interactions use one local session; live audio is optional. */
 internal class DesktopState {
@@ -46,6 +49,38 @@ internal class DesktopState {
     val lyricLines = mutableStateListOf<LyricLine>()
     var lyricsLoading by mutableStateOf(false)
     var lyricsSource by mutableStateOf("")
+    var lyricsOffsetMs by mutableIntStateOf(0)
+    fun adjustLyricsOffset(deltaMs: Int) { lyricsOffsetMs = (lyricsOffsetMs + deltaMs).coerceIn(-10_000, 10_000) }
+    var outputDialogOpen by mutableStateOf(false)
+    var outputLoading by mutableStateOf(false)
+    var outputError by mutableStateOf<String?>(null)
+    val outputDevices = mutableStateListOf<OutputDevice>()
+    var outputSelected by mutableStateOf("auto")
+    var outputVolume by mutableFloatStateOf(100f)
+    var statusMessage by mutableStateOf<String?>(null)
+    fun openOutput() {
+        outputDialogOpen = true
+        outputError = null
+        outputDevices.clear()
+        outputLoading = true
+        if (audio != null) audio?.queryOutputs()
+        else { outputLoading = false; outputError = "Audio output is available during live playback" }
+    }
+    fun closeOutput() { outputDialogOpen = false }
+    fun copyShareLink(track: MockTrack) {
+        copyText("https://music.youtube.com/watch?v=${track.id}")
+    }
+    fun copyPlaybackLog(track: MockTrack) {
+        copyText("BitChord Desktop\nSong ID: ${track.id}\nTitle: ${track.title}\n" +
+            "Duration: ${track.durationSeconds}s\nPosition: ${(track.durationSeconds * progress).toInt()}s\n" +
+            "Player: ${if (audioSeekAvailable) "mpv" else "ffplay or inactive"}\n" +
+            "Error: ${audioError.orEmpty()}")
+    }
+    private fun copyText(value: String) {
+        runCatching { Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(value), null) }
+            .onSuccess { statusMessage = "Copied to clipboard" }
+            .onFailure { statusMessage = "Clipboard unavailable: ${it.message}" }
+    }
     var sleepTimerEndsAt by mutableStateOf<Long?>(null)
         private set
     fun setSleepTimer(minutes: Int, nowMillis: Long = System.currentTimeMillis()) {

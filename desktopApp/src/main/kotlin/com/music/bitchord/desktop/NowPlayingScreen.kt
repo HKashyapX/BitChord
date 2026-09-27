@@ -40,6 +40,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -154,6 +155,7 @@ private fun MainControls(state: DesktopState) {
             Column(Modifier.weight(1f)) {
                 Text(track.title, fontSize = 28.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(track.artist, color = Color.White.copy(alpha = 0.62f), fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (track.album.isNotBlank()) Text(track.album, color = Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             IconButton(onClick = { state.toggleLike(track) }, modifier = Modifier.focusOutline(CircleShape)) {
                 Icon(
@@ -203,6 +205,10 @@ private fun MainControls(state: DesktopState) {
             } else "Sample track · search for a real song to play",
             color = if (state.audioError != null) Red else Muted, fontSize = 11.sp,
         )
+        TextButton(onClick = state::openOutput, enabled = state.isRealTrack) {
+            Text("Audio output · ${state.outputSelected}", color = Muted, fontSize = 12.sp)
+        }
+        state.statusMessage?.let { Text(it, color = Muted, fontSize = 11.sp) }
     }
 }
 
@@ -211,7 +217,8 @@ private fun LyricsPane(state: DesktopState) {
     val track = state.currentTrack ?: return
     val lines = state.lyricLines
     val positionMs = (track.durationSeconds * state.progress * 1000).toInt()
-    val activeIndex = lines.indexOfLast { it.timeMs <= positionMs }.coerceAtLeast(0)
+    val lyricPositionMs = positionMs + state.lyricsOffsetMs
+    val activeIndex = lines.indexOfLast { it.timeMs <= lyricPositionMs }.coerceAtLeast(0)
     val scroll = rememberLazyListState()
     LaunchedEffect(activeIndex, track.id) {
         if (lines.isNotEmpty()) scroll.animateScrollToItem((activeIndex - 1).coerceAtLeast(0))
@@ -220,6 +227,11 @@ private fun LyricsPane(state: DesktopState) {
         Text(track.title, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 1)
         Text(if (state.lyricsSource.isNotEmpty()) "Lyrics by ${state.lyricsSource}" else "Lyrics",
             color = Muted, fontSize = 12.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = { state.adjustLyricsOffset(-500) }) { Text("−0.5s") }
+            Text("Offset ${state.lyricsOffsetMs / 1000f}s", color = Muted, fontSize = 11.sp)
+            TextButton(onClick = { state.adjustLyricsOffset(500) }) { Text("+0.5s") }
+        }
         Spacer(Modifier.height(12.dp))
         if (lines.isEmpty()) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {

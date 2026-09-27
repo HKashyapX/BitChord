@@ -93,6 +93,22 @@ class PlayerTests(unittest.TestCase):
             _exists.return_value = False
             player.stop()
 
+    def test_mpv_output_controls_validate_device(self):
+        player = Player()
+        player.backend = "mpv"
+        player.process = MagicMock()
+        devices = [{"name": "auto", "description": "Default"},
+                   {"name": "pulse/sink", "description": "Speakers"}]
+        with patch.object(player, "_command_locked", side_effect=[devices, "auto", 72.0, devices, None, None]) as command:
+            self.assertEqual(player.output_info(),
+                             ([("auto", "Default"), ("pulse/sink", "Speakers")], "auto", 72.0))
+            player.set_output("pulse/sink")
+            player.set_volume(50)
+            self.assertEqual(command.call_args_list[-1].args, ("set_property", "volume", 50))
+        with patch.object(player, "_command_locked", return_value=devices):
+            with self.assertRaises(ValueError):
+                player.set_output("unknown")
+
 
 if __name__ == "__main__":
     unittest.main()
