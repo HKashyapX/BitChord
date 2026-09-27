@@ -7,6 +7,17 @@ import kotlin.test.assertTrue
 
 class DesktopStateTest {
     @Test
+    fun sleepTimerStopsPlaybackAtDeadline() {
+        val state = DesktopState()
+        state.selectTrack(mockTracks[0], mockTracks, "Test")
+        state.setSleepTimer(15, nowMillis = 1_000L)
+        state.checkSleepTimer(nowMillis = 900_000L)
+        assertEquals(true, state.isPlaying)
+        state.checkSleepTimer(nowMillis = 901_000L)
+        assertEquals(false, state.isPlaying)
+        assertEquals(null, state.sleepTimerEndsAt)
+    }
+    @Test
     fun playlistSelectionSharesPlayerAndBackDestination() {
         val state = DesktopState()
         state.navigate(Destination.LIKED_MUSIC)

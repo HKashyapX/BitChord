@@ -46,6 +46,19 @@ internal class DesktopState {
     val lyricLines = mutableStateListOf<LyricLine>()
     var lyricsLoading by mutableStateOf(false)
     var lyricsSource by mutableStateOf("")
+    var sleepTimerEndsAt by mutableStateOf<Long?>(null)
+        private set
+    fun setSleepTimer(minutes: Int, nowMillis: Long = System.currentTimeMillis()) {
+        sleepTimerEndsAt = if (minutes > 0) nowMillis + minutes * 60_000L else null
+    }
+    fun checkSleepTimer(nowMillis: Long = System.currentTimeMillis()) {
+        val end = sleepTimerEndsAt ?: return
+        if (nowMillis >= end) {
+            sleepTimerEndsAt = null
+            audio?.stop()
+            setActualPlayback(false)
+        }
+    }
     fun clearLyrics() {
         lyricLines.clear()
         lyricsLoading = false

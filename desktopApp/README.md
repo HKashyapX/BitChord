@@ -33,7 +33,8 @@ in the queue. The Home, Songs, and initial Liked Music tracks remain **sample
 data** and cannot be played; the player explains this when one is selected.
 
 The song actions menu offers like/dislike, play next, add to queue, add to a
-local playlist, and open album or artist detail pages for tracks seen in this
+local playlist, a session-only sleep timer for the current song, and open album
+or artist detail pages for tracks seen in this
 session. Likes, playlists, known search tracks, recents, and queue state are
 stored locally at `$XDG_CONFIG_HOME/bitchord/desktop-library.properties` (or
 `~/.config/bitchord/desktop-library.properties`). The Up next panel supports
