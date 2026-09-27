@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bitchord-desktop"
+version = "0.1.0"
+description = "An experimental Linux desktop client for BitChord"
+requires-python = ">=3.10"
+dependencies = ["ytmusicapi>=1.10,<2", "yt-dlp>=2025.1"]
+
+[project.scripts]
+bitchord-desktop = "bitchord_desktop.app:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bitchord_desktop*"]
