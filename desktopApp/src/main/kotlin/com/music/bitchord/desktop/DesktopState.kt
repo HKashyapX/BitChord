@@ -34,6 +34,7 @@ internal val mockTracks = listOf(
 internal enum class Destination { HOME, SEARCH, LIKED_MUSIC, SONGS, PLAYLISTS, ALBUM, ARTIST, PLAYLIST, NOW_PLAYING }
 internal enum class PlayerPane { MAIN, LYRICS, QUEUE }
 internal enum class RepeatMode { OFF, ALL, ONE }
+internal data class LyricLine(val timeMs: Int, val text: String)
 
 /** All desktop interactions use one local session; live audio is optional. */
 internal class DesktopState {
@@ -42,6 +43,14 @@ internal class DesktopState {
     var isAudioLoading by mutableStateOf(false)
     var audioStreamActive by mutableStateOf(false)
     var audioSeekAvailable by mutableStateOf(false)
+    val lyricLines = mutableStateListOf<LyricLine>()
+    var lyricsLoading by mutableStateOf(false)
+    var lyricsSource by mutableStateOf("")
+    fun clearLyrics() {
+        lyricLines.clear()
+        lyricsLoading = false
+        lyricsSource = ""
+    }
     var searchLoading by mutableStateOf(false)
     var liveResults by mutableStateOf<List<MockTrack>?>(null)
     val isRealTrack: Boolean get() = currentTrack?.let { it !in mockTracks } == true
@@ -134,6 +143,7 @@ internal class DesktopState {
     }
 
     fun selectTrack(track: MockTrack, from: List<MockTrack>, origin: String) {
+        clearLyrics()
         val context = from.ifEmpty { listOf(track) }
         queue.clear()
         queue.addAll(context)
@@ -154,6 +164,7 @@ internal class DesktopState {
 
     fun selectQueued(index: Int) {
         if (index !in queue.indices) return
+        clearLyrics()
         currentIndex = index
         progress = 0f
         isPlaying = audio == null
@@ -189,10 +200,12 @@ internal class DesktopState {
     }
     fun previous() {
         if (currentIndex > 0) currentIndex--
+        clearLyrics()
         progress = 0f
         if (audio != null) restartAudio()
     }
     fun next() {
+        clearLyrics()
         if (currentIndex < queue.lastIndex) {
             if (shuffleEnabled) {
                 val nextIndex = (currentIndex + 1..queue.lastIndex).random()

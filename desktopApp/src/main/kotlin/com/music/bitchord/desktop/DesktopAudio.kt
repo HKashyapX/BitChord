@@ -23,6 +23,7 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
     private var playbackId = 0
     private var requestId = 0
     private val pending = mutableMapOf<Int, MutableList<MockTrack>>()
+    private val pendingLyrics = mutableMapOf<Int, MutableList<LyricLine>>()
 
     init {
         Thread({
@@ -67,7 +68,12 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
         state.audioError = null
         state.isAudioLoading = true
         state.audioSeekAvailable = false
+        state.clearLyrics()
+        state.lyricsLoading = true
+        pendingLyrics.clear()
+        pendingLyrics[id] = mutableListOf()
         send("PLAY", id.toString(), track.id)
+        send("LYRICS", id.toString(), encode(track.title), encode(track.artist), track.durationSeconds.toString())
     }
 
     fun pause() = send("PAUSE", playbackId.toString())
@@ -105,6 +111,20 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
                 state.setActualPlayback(true)
             }
             "POSITION" -> if (id == playbackId) fields.getOrNull(2)?.toFloatOrNull()?.let(state::updatePosition)
+            "LYRIC" -> if (id == playbackId && fields.size >= 4) {
+                val time = fields[2].toIntOrNull()
+                if (time != null) pendingLyrics[id]?.add(LyricLine(time, decode(fields[3])))
+            }
+            "LYRICS_DONE" -> if (id == playbackId) {
+                state.lyricLines.clear()
+                state.lyricLines.addAll(pendingLyrics.remove(id).orEmpty())
+                state.lyricsSource = if (state.lyricLines.isEmpty()) "" else fields.getOrNull(2).orEmpty()
+                state.lyricsLoading = false
+            }
+            "LYRICS_ERROR" -> if (id == playbackId) {
+                pendingLyrics.remove(id)
+                state.lyricsLoading = false
+            }
             "SEEK_ERROR" -> if (id == playbackId) state.audioError = fields.getOrNull(2)?.let(::decode)
             "PAUSED" -> if (id == playbackId) state.setActualPlayback(false)
             "RESUMED" -> if (id == playbackId) state.setActualPlayback(true)

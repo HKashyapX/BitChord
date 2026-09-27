@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,6 +41,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -133,7 +137,7 @@ private fun PaneButton(label: String, active: Boolean, onClick: () -> Unit, icon
 private fun PlayerContent(state: DesktopState) {
     when (state.playerPane) {
         PlayerPane.MAIN -> MainControls(state)
-        PlayerPane.LYRICS -> LyricsPane()
+        PlayerPane.LYRICS -> LyricsPane(state)
         PlayerPane.QUEUE -> PlayerQueuePane(state)
     }
 }
@@ -194,18 +198,60 @@ private fun MainControls(state: DesktopState) {
         }
         Spacer(Modifier.height(18.dp))
         Text(
-            state.audioError ?: if (state.isAudioLoading) "Loading audio…" else if (state.isRealTrack) "Live audio · seeking is not available yet" else "Sample track · search for a real song to play",
+            state.audioError ?: if (state.isAudioLoading) "Loading audio…" else if (state.isRealTrack) {
+                if (state.audioSeekAvailable) "Live audio · drag to seek" else "Live audio · install mpv to seek"
+            } else "Sample track · search for a real song to play",
             color = if (state.audioError != null) Red else Muted, fontSize = 11.sp,
         )
     }
 }
 
 @Composable
-private fun LyricsPane() {
-    Column(Modifier.fillMaxWidth().height(320.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Text("Lyrics", fontSize = 25.sp, fontWeight = FontWeight.Bold)
+private fun LyricsPane(state: DesktopState) {
+    val track = state.currentTrack ?: return
+    val lines = state.lyricLines
+    val positionMs = (track.durationSeconds * state.progress * 1000).toInt()
+    val activeIndex = lines.indexOfLast { it.timeMs <= positionMs }.coerceAtLeast(0)
+    val scroll = rememberLazyListState()
+    LaunchedEffect(activeIndex, track.id) {
+        if (lines.isNotEmpty()) scroll.animateScrollToItem((activeIndex - 1).coerceAtLeast(0))
+    }
+    Column(Modifier.fillMaxWidth().height(390.dp)) {
+        Text(track.title, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(if (state.lyricsSource.isNotEmpty()) "Lyrics by ${state.lyricsSource}" else "Lyrics",
+            color = Muted, fontSize = 12.sp)
         Spacer(Modifier.height(12.dp))
-        Text("Lyrics are not available in this local preview.", color = Color.White.copy(alpha = 0.62f), fontSize = 14.sp)
+        if (lines.isEmpty()) {
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Text(if (state.lyricsLoading) "Finding lyrics…" else "No synchronized lyrics found for this song.",
+                    color = Muted, fontSize = 14.sp)
+            }
+        } else {
+            LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = scroll) {
+                itemsIndexed(lines) { index, line ->
+                    Text(line.text,
+                        color = if (index == activeIndex) Color.White else Color.White.copy(alpha = 0.42f),
+                        fontSize = if (index == activeIndex) 22.sp else 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.fillMaxWidth().clickable(enabled = state.audioSeekAvailable) {
+                            if (track.durationSeconds > 0) state.seekTo(line.timeMs / (track.durationSeconds * 1000f))
+                        }.padding(vertical = 9.dp),
+                    )
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(formatTime(positionMs / 1000), color = Muted, fontSize = 12.sp)
+            IconButton(onClick = state::previous) { Icon(Icons.Default.SkipPrevious, "Previous") }
+            IconButton(onClick = state::togglePlayback) {
+                Icon(if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    if (state.isPlaying) "Pause" else "Play")
+            }
+            IconButton(onClick = state::next, enabled = state.currentIndex < state.queue.lastIndex) {
+                Icon(Icons.Default.SkipNext, "Next")
+            }
+            Text(formatTime(track.durationSeconds), color = Muted, fontSize = 12.sp)
+        }
     }
 }
 

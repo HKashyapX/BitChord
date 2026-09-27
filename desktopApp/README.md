@@ -44,8 +44,9 @@ Real search results advance to the next queued track when audio ends. With
 `mpv`, the player reports elapsed time and supports seeking. With only `ffplay`,
 the real-track seek control stays disabled and elapsed time is unavailable.
 Real search tracks show provider artwork when available; sample tracks retain
-placeholders. Lyrics, sign-in, and playback from the sample catalog are still
-pending. The
+placeholders. The Lyrics pane tries LRCLIB for line-synchronized lyrics, highlights
+the current line, and lets you select a line when mpv supports seeking. Provider
+coverage varies. Sign-in and playback from the sample catalog are still pending. The
 underlying Python playback preview remains usable independently.
 
 For a UI-only demo without starting Python, run with `--offline`:
@@ -58,7 +59,7 @@ Follow the flow from Home's Listen again shelf into Liked Music. Selecting a
 track opens Now Playing; its Lyrics and Up next buttons switch the right pane.
 The back arrow returns to the playlist. Search has recent queries and live
 local-catalog results. Selecting any result updates the same player session.
-Lyrics display a labeled unavailable state.
+Lyrics display a labeled unavailable state when the provider has no match.
 
 Keyboard: Tab and Shift+Tab move focus, Enter/Space activate focused controls,
 Alt+Left goes back, Escape leaves Now Playing, and Ctrl+F opens Search.

@@ -11,6 +11,7 @@ import threading
 import time
 
 from .catalog import Track, search
+from .lyrics import fetch_lyrics
 from .player import Player
 
 
@@ -34,6 +35,7 @@ def main() -> None:
     player = Player()
     output_lock = threading.Lock()
     search_pool = ThreadPoolExecutor(max_workers=2)
+    lyrics_pool = ThreadPoolExecutor(max_workers=2)
     play_pool = ThreadPoolExecutor(max_workers=1)
     playback_lock = threading.Lock()
     playback_serial = 0
@@ -51,6 +53,14 @@ def main() -> None:
             emit("DONE", request)
         except Exception as exc:
             emit("ERROR", request, encode(str(exc)))
+
+    def do_lyrics(request: str, title: str, artist: str, duration: int) -> None:
+        try:
+            for when, line in fetch_lyrics(title, artist, duration):
+                emit("LYRIC", request, str(when), encode(line))
+            emit("LYRICS_DONE", request, "LRCLIB")
+        except Exception as exc:
+            emit("LYRICS_ERROR", request, encode(str(exc)))
 
     def watch_playback(request: str, serial: int) -> None:
         try:
@@ -94,6 +104,9 @@ def main() -> None:
             try:
                 if action == "SEARCH" and len(values) == 1:
                     search_pool.submit(do_search, request, decode(values[0]))
+                elif action == "LYRICS" and len(values) == 3:
+                    lyrics_pool.submit(do_lyrics, request, decode(values[0]),
+                                       decode(values[1]), int(values[2]))
                 elif action == "PLAY" and len(values) == 1:
                     track_id = values[0]
                     if not track_id or len(track_id) > 32 or not all(
@@ -127,6 +140,7 @@ def main() -> None:
     finally:
         player.close()
         search_pool.shutdown(wait=False, cancel_futures=True)
+        lyrics_pool.shutdown(wait=False, cancel_futures=True)
         play_pool.shutdown(wait=False, cancel_futures=True)
 
 
