@@ -38,6 +38,14 @@ internal fun SongActionsDialog(state: DesktopState, track: MockTrack) {
                 ActionLine("Add to playlist") { state.openPlaylistPicker(track) }
                 ActionLine("Play next") { state.playNext(track); state.closeActions() }
                 ActionLine("Add to queue") { state.addToQueue(track); state.closeActions() }
+                if (track.id !in mockTracks.map { it.id }) {
+                    ActionLine(when (track.id) {
+                        in state.downloadingIds -> "Downloading…"
+                        in state.downloadedIds -> "Downloaded"
+                        else -> "Download"
+                    }) { state.downloadTrack(track); state.closeActions() }
+                    ActionLine("Start radio") { state.startRadio(track); state.closeActions() }
+                }
                 ActionLine("Open album") { state.openAlbum(track) }
                 ActionLine("Open artist") { state.openArtist(track) }
                 if (track.id !in mockTracks.map { it.id }) {

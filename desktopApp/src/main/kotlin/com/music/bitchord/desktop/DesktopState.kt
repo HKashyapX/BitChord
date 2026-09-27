@@ -58,6 +58,29 @@ internal class DesktopState {
     var outputSelected by mutableStateOf("auto")
     var outputVolume by mutableFloatStateOf(100f)
     var statusMessage by mutableStateOf<String?>(null)
+    var radioLoading by mutableStateOf(false)
+    val downloadingIds = mutableStateListOf<String>()
+    val downloadedIds = mutableStateListOf<String>()
+    fun startRadio(track: MockTrack) {
+        if (track.id in mockTracks.map { it.id } || audio == null) {
+            statusMessage = "Radio needs a real song and an active audio helper"
+            return
+        }
+        radioLoading = true
+        statusMessage = "Loading radio for ${track.title}…"
+        audio?.radio(track)
+    }
+    fun downloadTrack(track: MockTrack) {
+        if (track.id in mockTracks.map { it.id } || audio == null) {
+            statusMessage = "Search for a real song to download"
+            return
+        }
+        if (track.id !in downloadingIds) {
+            downloadingIds.add(track.id)
+            statusMessage = "Downloading ${track.title}…"
+            audio?.download(track)
+        }
+    }
     fun openOutput() {
         outputDialogOpen = true
         outputError = null

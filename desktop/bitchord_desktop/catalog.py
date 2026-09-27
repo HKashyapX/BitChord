@@ -65,3 +65,14 @@ def lookup_artwork(video_id: str, title: str, artist: str) -> str:
         if track.video_id == video_id and track.artwork_url:
             return track.artwork_url
     return ""
+
+
+def radio(video_id: str) -> list[Track]:
+    from ytmusicapi import YTMusic
+
+    results = YTMusic().get_watch_playlist(videoId=video_id, limit=25, radio=True)
+    items = results.get("tracks") or []
+    if not isinstance(items, list):
+        return []
+    return [track for item in items if isinstance(item, dict)
+            and (track := parse_track(item)) is not None]

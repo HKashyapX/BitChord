@@ -24,6 +24,9 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
     private var requestId = 0
     private val pending = mutableMapOf<Int, MutableList<MockTrack>>()
     private val pendingLyrics = mutableMapOf<Int, MutableList<LyricLine>>()
+    private val pendingRadio = mutableMapOf<Int, MutableList<MockTrack>>()
+    private val radioSeeds = mutableMapOf<Int, MockTrack>()
+    private val downloadRequests = mutableMapOf<Int, MockTrack>()
 
     init {
         Thread({
@@ -84,6 +87,18 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
     fun queryOutputs() = send("OUTPUTS", playbackId.toString())
     fun setVolume(value: Float) = send("VOLUME", playbackId.toString(), value.toString())
     fun selectOutput(name: String) = send("OUTPUT_SELECT", playbackId.toString(), encode(name))
+    fun radio(track: MockTrack) {
+        val id = ++requestId
+        pendingRadio.clear(); radioSeeds.clear()
+        pendingRadio[id] = mutableListOf()
+        radioSeeds[id] = track
+        send("RADIO", id.toString(), track.id)
+    }
+    fun download(track: MockTrack) {
+        val id = ++requestId
+        downloadRequests[id] = track
+        send("DOWNLOAD", id.toString(), track.id)
+    }
     fun stop() {
         playbackId = ++requestId
         state.audioStreamActive = false
@@ -98,12 +113,34 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
         if (fields.size < 2) return
         val id = fields[1].toIntOrNull() ?: return
         when (fields[0]) {
-            "TRACK" -> if (id == searchId && fields.size >= 7) {
-                pending[id]?.add(MockTrack(fields[2], decode(fields[3]), decode(fields[4]),
-                    decode(fields[5]), parseDuration(decode(fields[6])),
-                    androidx.compose.ui.graphics.Color(0xFF303039),
-                    androidx.compose.ui.graphics.Color(0xFF45404A),
-                    fields.getOrNull(7)?.let(::decode).orEmpty()))
+            "TRACK" -> if (id == searchId && fields.size >= 7) pending[id]?.add(parseTrack(fields))
+            "RADIO_TRACK" -> if (id in pendingRadio && fields.size >= 7) pendingRadio[id]?.add(parseTrack(fields))
+            "RADIO_DONE" -> {
+                val seed = radioSeeds.remove(id)
+                if (seed != null) {
+                    val tracks = pendingRadio.remove(id).orEmpty().filter { it.id != seed.id }
+                    state.radioLoading = false
+                    if (tracks.isEmpty()) state.statusMessage = "No radio tracks were returned"
+                    else {
+                        state.rememberTracks(tracks)
+                        state.selectTrack(seed, listOf(seed) + tracks, "Radio")
+                        state.statusMessage = "Radio · ${tracks.size} songs"
+                    }
+                }
+            }
+            "RADIO_ERROR" -> if (id in radioSeeds) {
+                pendingRadio.remove(id); radioSeeds.remove(id)
+                state.radioLoading = false
+                state.statusMessage = fields.getOrNull(2)?.let(::decode)
+            }
+            "DOWNLOAD_DONE" -> downloadRequests.remove(id)?.let { track ->
+                state.downloadingIds.remove(track.id)
+                if (track.id !in state.downloadedIds) state.downloadedIds.add(track.id)
+                state.statusMessage = "Saved ${track.title} for offline playback"
+            }
+            "DOWNLOAD_ERROR" -> downloadRequests.remove(id)?.let { track ->
+                state.downloadingIds.remove(track.id)
+                state.statusMessage = "Download failed: ${fields.getOrNull(3)?.let(::decode).orEmpty()}"
             }
             "DONE" -> if (id == searchId) {
                 state.liveResults = pending.remove(id).orEmpty()
@@ -186,6 +223,10 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
 
     private fun encode(value: String) = Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
     private fun decode(value: String) = String(Base64.getDecoder().decode(value), Charsets.UTF_8)
+    private fun parseTrack(fields: List<String>) = MockTrack(fields[2], decode(fields[3]), decode(fields[4]),
+        decode(fields[5]), parseDuration(decode(fields[6])),
+        androidx.compose.ui.graphics.Color(0xFF303039), androidx.compose.ui.graphics.Color(0xFF45404A),
+        fields.getOrNull(7)?.let(::decode).orEmpty())
 }
 
 internal fun parseDuration(value: String): Int = value.split(':').mapNotNull(String::toIntOrNull)
