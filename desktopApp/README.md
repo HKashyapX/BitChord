@@ -6,10 +6,11 @@ results** now use the existing Python desktop catalog/player through a local
 subprocess. No server, Docker, account, or credentials are needed. The Android
 app and Listen Together server remain separate.
 
-On Fedora, install Python 3.10+, FFmpeg with `ffplay`, and the Python package:
+On Fedora, install Python 3.10+, `mpv` for elapsed time and seeking, and the
+Python package. `ffplay` remains a fallback for playback without seeking:
 
 ```sh
-sudo dnf install python3 ffmpeg-free
+sudo dnf install python3 mpv
 python3 -m venv .venv-desktop
 .venv-desktop/bin/python -m pip install -e ./desktop
 ```
@@ -39,10 +40,11 @@ stored locally at `$XDG_CONFIG_HOME/bitchord/desktop-library.properties` (or
 moving and removing upcoming tracks; shuffle chooses from the remaining queue
 when advancing, and repeat cycles off → all → one. Queue actions are shared
 between Now Playing and the browsing sidebar.
-Real search results advance to the next queued track when audio ends.
-Seek and progress tracking are not yet supported for real audio, so the real
-track seek control is disabled. Album art, lyrics, persistence, sign-in, and
-playback from the sample catalog are still pending. The
+Real search results advance to the next queued track when audio ends. With
+`mpv`, the player reports elapsed time and supports seeking. With only `ffplay`,
+the real-track seek control stays disabled and elapsed time is unavailable.
+Album art, lyrics, sign-in, and playback from the sample catalog are still
+pending. The
 underlying Python playback preview remains usable independently.
 
 For a UI-only demo without starting Python, run with `--offline`:

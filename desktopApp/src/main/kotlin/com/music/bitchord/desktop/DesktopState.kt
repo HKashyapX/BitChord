@@ -40,6 +40,7 @@ internal class DesktopState {
     var audioError by mutableStateOf<String?>(null)
     var isAudioLoading by mutableStateOf(false)
     var audioStreamActive by mutableStateOf(false)
+    var audioSeekAvailable by mutableStateOf(false)
     var searchLoading by mutableStateOf(false)
     var liveResults by mutableStateOf<List<MockTrack>?>(null)
     val isRealTrack: Boolean get() = currentTrack?.let { it !in mockTracks } == true
@@ -173,7 +174,18 @@ internal class DesktopState {
             if (audioStreamActive) audio?.pause() else currentTrack?.let { audio?.play(it) }
         }
     }
-    fun seekTo(fraction: Float) { progress = fraction.coerceIn(0f, 1f) }
+    fun seekTo(fraction: Float) {
+        progress = fraction.coerceIn(0f, 1f)
+        if (isRealTrack && audioSeekAvailable) {
+            val duration = currentTrack?.durationSeconds ?: 0
+            if (duration > 0) audio?.seek(duration * progress)
+        }
+    }
+
+    fun updatePosition(seconds: Float) {
+        val duration = currentTrack?.durationSeconds ?: 0
+        if (duration > 0) progress = (seconds / duration).coerceIn(0f, 1f)
+    }
     fun previous() {
         if (currentIndex > 0) currentIndex--
         progress = 0f
