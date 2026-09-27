@@ -44,8 +44,10 @@ between Now Playing and the browsing sidebar.
 Real search results advance to the next queued track when audio ends. With
 `mpv`, the player reports elapsed time and supports seeking. With only `ffplay`,
 the real-track seek control stays disabled and elapsed time is unavailable.
-Real search tracks show provider artwork when available, falling back to the
-video thumbnail for older saved songs. Sample tracks retain placeholders. The
+Real search tracks show the largest provider artwork when available. Older saved
+tracks refresh their artwork when played; if the provider has no matching music
+cover, the video thumbnail is cropped and shown at a bounded size. Sample tracks
+retain placeholders. The
 Lyrics pane tries LRCLIB for line-synchronized lyrics, highlights
 the current line, and lets you select a line when mpv supports seeking. Provider
 coverage varies. Sign-in and playback from the sample catalog are still pending. The

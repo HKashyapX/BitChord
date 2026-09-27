@@ -10,7 +10,7 @@ import sys
 import threading
 import time
 
-from .catalog import Track, search
+from .catalog import Track, lookup_artwork, search
 from .lyrics import fetch_lyrics
 from .player import Player
 
@@ -62,6 +62,15 @@ def main() -> None:
         except Exception as exc:
             emit("LYRICS_ERROR", request, encode(str(exc)))
 
+    def do_artwork(request: str, track_id: str, title: str, artist: str) -> None:
+        try:
+            artwork = lookup_artwork(track_id, title, artist)
+            if artwork:
+                emit("ARTWORK", request, encode(artwork))
+        except Exception:
+            # Artwork is optional; a failed lookup must not interrupt audio.
+            pass
+
     def watch_playback(request: str, serial: int) -> None:
         try:
             while True:
@@ -107,6 +116,13 @@ def main() -> None:
                 elif action == "LYRICS" and len(values) == 3:
                     lyrics_pool.submit(do_lyrics, request, decode(values[0]),
                                        decode(values[1]), int(values[2]))
+                elif action == "ARTWORK_LOOKUP" and len(values) == 3:
+                    track_id = values[0]
+                    if not track_id or len(track_id) > 32 or not all(
+                        char.isascii() and (char.isalnum() or char in "_-") for char in track_id
+                    ):
+                        raise ValueError("Invalid track ID")
+                    search_pool.submit(do_artwork, request, track_id, decode(values[1]), decode(values[2]))
                 elif action == "PLAY" and len(values) == 1:
                     track_id = values[0]
                     if not track_id or len(track_id) > 32 or not all(

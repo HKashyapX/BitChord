@@ -26,15 +26,20 @@ def parse_track(item: dict) -> Track | None:
     thumbnails = item.get("thumbnails") or []
     artwork_url = ""
     if isinstance(thumbnails, list):
-        for thumbnail in reversed(thumbnails):
+        choices = []
+        for thumbnail in thumbnails:
             url = thumbnail.get("url") if isinstance(thumbnail, dict) else None
             if isinstance(url, str):
                 parsed = urlparse(url)
                 if parsed.scheme == "https" and parsed.hostname in {
                     "lh3.googleusercontent.com", "i.ytimg.com", "yt3.ggpht.com"
                 }:
-                    artwork_url = url
-                    break
+                    width = thumbnail.get("width", 0)
+                    height = thumbnail.get("height", 0)
+                    size = width * height if isinstance(width, int) and isinstance(height, int) else 0
+                    choices.append((size, url))
+        if choices:
+            artwork_url = max(choices, key=lambda candidate: candidate[0])[1]
     return Track(
         video_id=video_id,
         title=str(item.get("title") or "Untitled"),
@@ -52,3 +57,11 @@ def search(query: str) -> list[Track]:
 
     results = YTMusic().search(query.strip(), filter="songs", limit=30)
     return [track for item in results if (track := parse_track(item)) is not None]
+
+
+def lookup_artwork(video_id: str, title: str, artist: str) -> str:
+    """Refresh metadata for a saved track without substituting another song's art."""
+    for track in search(f"{title} {artist}"):
+        if track.video_id == video_id and track.artwork_url:
+            return track.artwork_url
+    return ""
