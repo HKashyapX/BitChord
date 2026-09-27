@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -74,6 +75,9 @@ internal fun DesktopTrackRow(
         }
         IconButton(onClick = { state.addToQueue(track) }, modifier = Modifier.size(34.dp).focusOutline(RoundedCornerShape(17.dp))) {
             Icon(Icons.Default.Add, "Add ${track.title} to queue", tint = Muted, modifier = Modifier.size(18.dp))
+        }
+        if (!compact) IconButton(onClick = { state.openActions(track) }, modifier = Modifier.size(34.dp).focusOutline(RoundedCornerShape(17.dp))) {
+            Icon(Icons.Default.MoreHoriz, "More actions for ${track.title}", tint = Muted, modifier = Modifier.size(18.dp))
         }
     }
 }

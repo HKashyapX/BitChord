@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -149,6 +150,9 @@ private fun MainControls(state: DesktopState) {
                     tint = if (state.isLiked(track)) Red else Color.White,
                 )
             }
+            IconButton(onClick = { state.openActions(track) }, modifier = Modifier.focusOutline(CircleShape)) {
+                Icon(Icons.Default.MoreHoriz, "More actions for ${track.title}")
+            }
         }
         Spacer(Modifier.height(24.dp))
         Slider(
@@ -197,6 +201,7 @@ private fun LyricsPane() {
 private fun PlayerQueuePane(state: DesktopState) {
     Column(Modifier.fillMaxWidth().height(380.dp).verticalScroll(rememberScrollState())) {
         Text("Up next", fontSize = 25.sp, fontWeight = FontWeight.Bold)
+        QueueModeControls(state)
         Spacer(Modifier.height(16.dp))
         state.queue.forEachIndexed { index, track ->
             Row(
@@ -208,6 +213,12 @@ private fun PlayerQueuePane(state: DesktopState) {
                 Column(Modifier.weight(1f)) {
                     Text(track.title, color = if (index == state.currentIndex) Color.White else Color.White.copy(alpha = 0.75f), fontSize = 13.sp, fontWeight = if (index == state.currentIndex) FontWeight.Bold else FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(if (index == state.currentIndex) "Now playing · ${track.artist}" else track.artist, color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                if (index > state.currentIndex) {
+                    QueueMoveButtons(state, index)
+                    IconButton(onClick = { state.removeUpcoming(index) }, modifier = Modifier.size(27.dp)) {
+                        Icon(androidx.compose.material.icons.Icons.Default.Close, "Remove ${track.title}", modifier = Modifier.size(17.dp))
+                    }
                 }
             }
         }

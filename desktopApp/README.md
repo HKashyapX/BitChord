@@ -30,6 +30,13 @@ Open Search, type a song or artist, then select a result to hear it. Search
 requires internet. Play/pause and next/previous operate on the real results
 in the queue. The Home, Songs, and initial Liked Music tracks remain **sample
 data** and cannot be played; the player explains this when one is selected.
+
+The song actions menu offers like/dislike, play next, add to queue, add to a
+local playlist, and open album or artist detail pages for tracks seen in this
+session. Playlists and likes are session-only. The Up next panel supports
+moving and removing upcoming tracks; shuffle chooses from the remaining queue
+when advancing, and repeat cycles off → all → one. Queue actions are shared
+between Now Playing and the browsing sidebar.
 Real search results advance to the next queued track when audio ends.
 Seek and progress tracking are not yet supported for real audio, so the real
 track seek control is disabled. Album art, lyrics, persistence, sign-in, and

@@ -102,6 +102,9 @@ private fun DesktopApp(state: DesktopState) {
                                 Destination.SEARCH -> SearchScreen(state)
                                 Destination.LIKED_MUSIC -> LikedMusicScreen(state)
                                 Destination.SONGS -> SongsScreen(state)
+                                Destination.PLAYLISTS -> PlaylistsScreen(state)
+                                Destination.PLAYLIST -> PlaylistScreen(state)
+                                Destination.ALBUM, Destination.ARTIST -> DetailScreen(state)
                                 Destination.NOW_PLAYING -> Unit
                             }
                         }
@@ -114,5 +117,7 @@ private fun DesktopApp(state: DesktopState) {
                 }
             }
         }
+        state.actionTrack?.let { SongActionsDialog(state, it) }
+        state.playlistPickerTrack?.let { PlaylistPickerDialog(state, it) }
     }
 }

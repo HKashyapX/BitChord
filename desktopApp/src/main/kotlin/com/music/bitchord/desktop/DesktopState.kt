@@ -3,6 +3,7 @@ package com.music.bitchord.desktop
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -29,8 +30,9 @@ internal val mockTracks = listOf(
     MockTrack("chamber", "Chamber of Reflection", "Mac DeMarco", "Salad Days", 231, Color(0xFF37392F), Color(0xFF4D5040)),
 )
 
-internal enum class Destination { HOME, SEARCH, LIKED_MUSIC, SONGS, NOW_PLAYING }
+internal enum class Destination { HOME, SEARCH, LIKED_MUSIC, SONGS, PLAYLISTS, ALBUM, ARTIST, PLAYLIST, NOW_PLAYING }
 internal enum class PlayerPane { MAIN, LYRICS, QUEUE }
+internal enum class RepeatMode { OFF, ALL, ONE }
 
 /** All desktop interactions use one local session; live audio is optional. */
 internal class DesktopState {
@@ -58,8 +60,22 @@ internal class DesktopState {
         private set
     var playerPane by mutableStateOf(PlayerPane.MAIN)
         private set
+    var repeatMode by mutableStateOf(RepeatMode.OFF)
+        private set
+    var shuffleEnabled by mutableStateOf(false)
+        private set
+    var actionTrack by mutableStateOf<MockTrack?>(null)
+        private set
+    var playlistPickerTrack by mutableStateOf<MockTrack?>(null)
+        private set
+    var detailTrack by mutableStateOf<MockTrack?>(null)
+        private set
+    var selectedPlaylist by mutableStateOf<String?>(null)
+        private set
+    val playlists = mutableStateMapOf("Desktop Mix" to listOf<MockTrack>())
 
     val likedIds = mutableStateListOf("midnight", "less", "after", "space", "chamber")
+    val dislikedIds = mutableStateListOf<String>()
     val knownTracks = mutableStateListOf<MockTrack>().apply { addAll(mockTracks) }
     val likedTracks: List<MockTrack> get() = knownTracks.filter { it.id in likedIds }
     fun rememberTracks(tracks: List<MockTrack>) {
@@ -137,25 +153,95 @@ internal class DesktopState {
     }
     fun next() {
         if (currentIndex < queue.lastIndex) {
+            if (shuffleEnabled) {
+                val nextIndex = (currentIndex + 1..queue.lastIndex).random()
+                val chosen = queue[nextIndex]
+                queue[nextIndex] = queue[currentIndex + 1]
+                queue[currentIndex + 1] = chosen
+            }
             currentIndex++
+            progress = 0f
+            isPlaying = audio == null
+            if (audio != null) restartAudio()
+        } else if (repeatMode == RepeatMode.ALL && queue.isNotEmpty()) {
+            currentIndex = 0
             progress = 0f
             isPlaying = audio == null
             if (audio != null) restartAudio()
         }
     }
 
+    fun advanceOnEnd() {
+        if (repeatMode == RepeatMode.ONE && currentTrack != null) {
+            progress = 0f
+            isPlaying = audio == null
+            if (audio != null) restartAudio()
+        } else if (currentIndex < queue.lastIndex || repeatMode == RepeatMode.ALL) {
+            next()
+        } else {
+            isPlaying = false
+        }
+    }
+
+    fun toggleShuffle() { shuffleEnabled = !shuffleEnabled }
+    fun cycleRepeat() {
+        repeatMode = when (repeatMode) {
+            RepeatMode.OFF -> RepeatMode.ALL
+            RepeatMode.ALL -> RepeatMode.ONE
+            RepeatMode.ONE -> RepeatMode.OFF
+        }
+    }
+
     private fun restartAudio() {
         val track = currentTrack
         if (track != null && track !in mockTracks) audio?.play(track)
-        else { audio?.stop(); audioError = "Sample track: search for a real song to play audio." }
+        else { audio?.stop(); isPlaying = false; audioError = "Sample track: search for a real song to play audio." }
     }
 
     fun addToQueue(track: MockTrack) { queue.add(track) }
+    fun playNext(track: MockTrack) { queue.add((currentIndex + 1).coerceAtMost(queue.size), track) }
+    fun moveUpcoming(from: Int, to: Int) {
+        if (from <= currentIndex || to <= currentIndex || from !in queue.indices || to !in queue.indices) return
+        val track = queue.removeAt(from)
+        queue.add(to, track)
+    }
     fun removeUpcoming(index: Int) { if (index > currentIndex && index in queue.indices) queue.removeAt(index) }
     fun clearUpcoming() { while (queue.size > currentIndex + 1) queue.removeAt(queue.lastIndex) }
     fun isLiked(track: MockTrack): Boolean = track.id in likedIds
     fun toggleLike(track: MockTrack) {
-        if (isLiked(track)) likedIds.remove(track.id) else likedIds.add(track.id)
+        if (isLiked(track)) likedIds.remove(track.id) else {
+            dislikedIds.remove(track.id)
+            likedIds.add(track.id)
+        }
+    }
+    fun toggleDislike(track: MockTrack) {
+        if (track.id in dislikedIds) dislikedIds.remove(track.id) else {
+            likedIds.remove(track.id)
+            dislikedIds.add(track.id)
+        }
+    }
+    fun openActions(track: MockTrack) { actionTrack = track }
+    fun closeActions() { actionTrack = null }
+    fun openPlaylistPicker(track: MockTrack) { actionTrack = null; playlistPickerTrack = track }
+    fun closePlaylistPicker() { playlistPickerTrack = null }
+    fun openAlbum(track: MockTrack) { detailTrack = track; actionTrack = null; navigate(Destination.ALBUM) }
+    fun openArtist(track: MockTrack) { detailTrack = track; actionTrack = null; navigate(Destination.ARTIST) }
+    val detailTracks: List<MockTrack> get() = detailTrack?.let { selected ->
+        knownTracks.filter {
+            if (destination == Destination.ALBUM) it.album == selected.album && it.artist == selected.artist
+            else it.artist == selected.artist
+        }
+    }.orEmpty()
+    fun openPlaylist(name: String) { selectedPlaylist = name; navigate(Destination.PLAYLIST) }
+    fun addToPlaylist(name: String, track: MockTrack) {
+        val existing = playlists[name].orEmpty()
+        if (existing.none { it.id == track.id }) playlists[name] = existing + track
+    }
+    fun createPlaylist(name: String): Boolean {
+        val cleaned = name.trim()
+        if (cleaned.isEmpty() || cleaned in playlists) return false
+        playlists[cleaned] = emptyList()
+        return true
     }
 
     fun showPane(pane: PlayerPane) { playerPane = if (playerPane == pane) PlayerPane.MAIN else pane }
