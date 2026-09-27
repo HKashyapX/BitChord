@@ -74,6 +74,9 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
         pendingLyrics[id] = mutableListOf()
         send("PLAY", id.toString(), track.id)
         send("LYRICS", id.toString(), encode(track.title), encode(track.artist), track.durationSeconds.toString())
+        if (track.artworkUrl.isBlank()) {
+            send("ARTWORK_LOOKUP", id.toString(), track.id, encode(track.title), encode(track.artist))
+        }
     }
 
     fun pause() = send("PAUSE", playbackId.toString())
@@ -111,6 +114,11 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
                 state.setActualPlayback(true)
             }
             "POSITION" -> if (id == playbackId) fields.getOrNull(2)?.toFloatOrNull()?.let(state::updatePosition)
+            "ARTWORK" -> if (id == playbackId) {
+                val track = state.currentTrack
+                val url = fields.getOrNull(2)?.let(::decode).orEmpty()
+                if (track != null && url.isNotBlank()) state.rememberTracks(listOf(track.copy(artworkUrl = url)))
+            }
             "LYRIC" -> if (id == playbackId && fields.size >= 4) {
                 val time = fields[2].toIntOrNull()
                 if (time != null) pendingLyrics[id]?.add(LyricLine(time, decode(fields[3])))

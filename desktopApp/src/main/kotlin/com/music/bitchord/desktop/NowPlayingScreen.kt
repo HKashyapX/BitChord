@@ -104,7 +104,7 @@ private fun ArtworkColumn(state: DesktopState, modifier: Modifier, compact: Bool
             CoverPlaceholder(state.currentTrack, Modifier.size(220.dp), 13.dp)
         } else {
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                val side = minOf(maxWidth, maxHeight)
+                val side = minOf(maxWidth, maxHeight, 560.dp)
                 CoverPlaceholder(state.currentTrack, Modifier.size(side), 13.dp)
             }
         }

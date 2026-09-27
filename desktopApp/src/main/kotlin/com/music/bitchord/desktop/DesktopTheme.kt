@@ -32,7 +32,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import java.net.HttpURLConnection
 import java.net.URI
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.ConcurrentHashMap
+import javax.imageio.ImageIO
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -62,6 +65,34 @@ internal fun DesktopTheme(content: @Composable () -> Unit) {
 
 private val coverCache = ConcurrentHashMap<String, ImageBitmap>()
 
+/** Some YouTube video thumbnails contain solid black letterbox bars. */
+private fun trimVideoLetterbox(bytes: ByteArray): ByteArray {
+    val image = ImageIO.read(ByteArrayInputStream(bytes)) ?: return bytes
+    val width = image.width
+    val height = image.height
+    if (width < 100 || height < 100) return bytes
+    fun darkRow(y: Int): Boolean {
+        val samples = (1..19).count { index ->
+            val pixel = image.getRGB(index * width / 20, y)
+            val red = pixel shr 16 and 0xff
+            val green = pixel shr 8 and 0xff
+            val blue = pixel and 0xff
+            red < 24 && green < 24 && blue < 24
+        }
+        return samples >= 17
+    }
+    var top = 0
+    var bottom = height - 1
+    while (top < height / 4 && darkRow(top)) top++
+    while (bottom > height * 3 / 4 && darkRow(bottom)) bottom--
+    if (top < height / 20 || height - 1 - bottom < height / 20) return bytes
+    val cropped = image.getSubimage(0, top, width, bottom - top + 1)
+    return ByteArrayOutputStream().use { output ->
+        ImageIO.write(cropped, "png", output)
+        output.toByteArray()
+    }
+}
+
 internal fun artworkCandidates(track: MockTrack?): List<String> {
     if (track == null || mockTracks.any { it.id == track.id }) return emptyList()
     val fallback = track.id.takeIf { it.matches(Regex("[A-Za-z0-9_-]{1,32}")) }
@@ -84,7 +115,12 @@ private fun loadCover(url: String): ImageBitmap? {
                 !connection.contentType.orEmpty().startsWith("image/") ||
                 connection.contentLengthLong > 2_000_000) return null
             val bytes = connection.inputStream.use { it.readNBytes(2_000_001) }
-            if (bytes.size > 2_000_000) null else bytes.decodeToImageBitmap()
+            if (bytes.size > 2_000_000) null else {
+                val imageBytes = if (uri.host == "i.ytimg.com" && uri.path.endsWith("/hqdefault.jpg")) {
+                    trimVideoLetterbox(bytes)
+                } else bytes
+                imageBytes.decodeToImageBitmap()
+            }
         } finally {
             connection.disconnect()
         }
