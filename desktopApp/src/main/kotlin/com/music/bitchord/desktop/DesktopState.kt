@@ -57,6 +57,27 @@ internal class DesktopState {
     val outputDevices = mutableStateListOf<OutputDevice>()
     var outputSelected by mutableStateOf("auto")
     var outputVolume by mutableFloatStateOf(100f)
+    var pipelineDialogOpen by mutableStateOf(false)
+    var pipelineLoading by mutableStateOf(false)
+    var pipelineError by mutableStateOf<String?>(null)
+    val pipelineFields = mutableStateMapOf<String, String>()
+    var qualityMode by mutableStateOf("best")
+    fun openPipeline() {
+        pipelineDialogOpen = true
+        pipelineError = null
+        pipelineFields.clear()
+        pipelineLoading = true
+        if (audioStreamActive) audio?.queryPipeline()
+        else { pipelineLoading = false; pipelineError = "Play a real song with mpv to inspect the audio pipeline" }
+    }
+    fun changeQuality(mode: String) {
+        val track = currentTrack ?: return
+        if (track in mockTracks || audio == null) return
+        audio?.changeQuality(mode, track)
+        qualityMode = mode
+        statusMessage = "Audio preference: ${if (mode == "best") "best available" else "standard when available"}"
+        pipelineDialogOpen = false
+    }
     var statusMessage by mutableStateOf<String?>(null)
     var radioLoading by mutableStateOf(false)
     val downloadingIds = mutableStateListOf<String>()
@@ -164,13 +185,13 @@ internal class DesktopState {
         tracks.forEach { track ->
             val index = knownTracks.indexOfFirst { it.id == track.id }
             if (index < 0) knownTracks.add(track)
-            else if (knownTracks[index].artworkUrl.isBlank() && track.artworkUrl.isNotBlank()) {
+            else if (knownTracks[index] != track) {
                 knownTracks[index] = track
-                queue.indices.filter { queue[it].id == track.id && queue[it].artworkUrl.isBlank() }
+                queue.indices.filter { queue[it].id == track.id }
                     .forEach { queue[it] = track }
                 playlists.toMap().forEach { (name, songs) ->
                     if (songs.any { it.id == track.id }) playlists[name] = songs.map {
-                        if (it.id == track.id && it.artworkUrl.isBlank()) track else it
+                        if (it.id == track.id) track else it
                     }
                 }
             }

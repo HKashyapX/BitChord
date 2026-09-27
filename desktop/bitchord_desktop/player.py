@@ -15,12 +15,13 @@ from .catalog import Track
 from .downloads import saved_audio
 
 
-def resolve_stream(video_id: str) -> tuple[str, dict[str, str]]:
+def resolve_stream(video_id: str, quality: str = "best") -> tuple[str, dict[str, str]]:
     from yt_dlp import YoutubeDL
     from yt_dlp.utils import DownloadError
 
     try:
-        with YoutubeDL({"format": "bestaudio/best", "quiet": True, "no_warnings": True,
+        selector = "bestaudio[abr<=128]/bestaudio/best" if quality == "standard" else "bestaudio/best"
+        with YoutubeDL({"format": selector, "quiet": True, "no_warnings": True,
                         "noplaylist": True, "socket_timeout": 10,
                         "retries": 1, "extractor_retries": 1}) as dl:
             info = dl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
@@ -50,6 +51,8 @@ class Player:
         self._closed = False
         self.paused = False
         self.backend = ""
+        self.quality = "best"
+        self.local_source = False
         self._ipc_dir: str | None = None
 
     @property
@@ -64,12 +67,13 @@ class Player:
         if local is not None:
             url, headers = str(local), {}
         else:
-            url, headers = resolve_stream(track.video_id)
+            url, headers = resolve_stream(track.video_id, self.quality)
         with self._lock:
             if self._closed:
                 return
             self._stop_locked()
             self.backend = backend
+            self.local_source = local is not None
             if backend == "mpv":
                 self._ipc_dir = tempfile.mkdtemp(prefix="bitchord-mpv-")
                 socket_path = os.path.join(self._ipc_dir, "ipc")
@@ -129,6 +133,32 @@ class Player:
                 return max(0.0, float(value)) if value is not None else None
             except (OSError, ValueError, RuntimeError):
                 return None
+
+    def set_quality(self, quality: str) -> None:
+        if quality not in {"standard", "best"}:
+            raise ValueError("Unknown audio quality")
+        with self._lock:
+            self.quality = quality
+
+    def pipeline(self) -> dict[str, str]:
+        with self._lock:
+            if not self.supports_seek:
+                raise ValueError("Audio pipeline details require an active mpv stream")
+            result: dict[str, str] = {}
+            for key, property_name in (("Codec", "audio-codec"),
+                                       ("Input", "audio-params"), ("Output", "audio-out-params")):
+                try:
+                    value = self._command_locked("get_property", property_name)
+                    if isinstance(value, dict):
+                        result[key] = " · ".join(f"{k}: {v}" for k, v in value.items()
+                                                 if k in {"samplerate", "channels", "format", "channel-count"})
+                    elif isinstance(value, str):
+                        result[key] = value
+                except (OSError, RuntimeError):
+                    continue
+            result["Source"] = "Downloaded file" if self.local_source else "Online stream"
+            result["Preference"] = "Best available" if self.quality == "best" else "Standard when available"
+            return result
 
     def seek(self, seconds: float) -> bool:
         with self._lock:
