@@ -16,6 +16,12 @@ class Track:
     is_video: bool = False
 
 
+@dataclass(frozen=True)
+class HomeShelf:
+    title: str
+    tracks: tuple[Track, ...]
+
+
 def parse_track(item: dict) -> Track | None:
     video_id = item.get("videoId")
     if not isinstance(video_id, str) or not video_id or not all(
@@ -60,6 +66,31 @@ def search(query: str) -> list[Track]:
 
     results = YTMusic().search(query.strip(), filter="songs", limit=30)
     return [track for item in results if (track := parse_track(item)) is not None]
+
+
+def home(limit: int = 12) -> list[HomeShelf]:
+    """Return the playable song shelves from YouTube Music's guest home feed."""
+    from ytmusicapi import YTMusic
+
+    sections = YTMusic().get_home(limit=limit)
+    shelves: list[HomeShelf] = []
+    seen_ids: set[str] = set()
+    for section in sections if isinstance(sections, list) else []:
+        if not isinstance(section, dict):
+            continue
+        title = str(section.get("title") or "Music for you").strip()
+        contents = section.get("contents") or []
+        tracks: list[Track] = []
+        for item in contents if isinstance(contents, list) else []:
+            if not isinstance(item, dict):
+                continue
+            track = parse_track(item)
+            if track is not None and track.video_id not in seen_ids:
+                seen_ids.add(track.video_id)
+                tracks.append(track)
+        if tracks:
+            shelves.append(HomeShelf(title, tuple(tracks)))
+    return shelves
 
 
 def lookup_artwork(video_id: str, title: str, artist: str) -> str:

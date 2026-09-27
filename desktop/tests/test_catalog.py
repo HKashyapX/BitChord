@@ -4,8 +4,9 @@ from unittest.mock import patch
 from unittest.mock import MagicMock
 import sys
 
-from bitchord_desktop.catalog import (Track, build_radio, find_video_version, lookup_artwork,
-                                      lookup_metadata, parse_track, radio, same_recording)
+from bitchord_desktop.catalog import (HomeShelf, Track, build_radio, find_video_version, home,
+                                      lookup_artwork, lookup_metadata, parse_track, radio,
+                                      same_recording)
 
 
 class CatalogTests(unittest.TestCase):
@@ -46,6 +47,25 @@ class CatalogTests(unittest.TestCase):
         with patch.dict(sys.modules, {"ytmusicapi": api}):
             self.assertEqual(radio("abc"), [Track("abc", "Song", "Artist")])
         api.YTMusic.return_value.get_watch_playlist.assert_called_once_with(videoId="abc", limit=25, radio=True)
+
+    def test_home_keeps_playable_shelves_and_deduplicates_tracks(self):
+        api = MagicMock()
+        api.YTMusic.return_value.get_home.return_value = [
+            {"title": "Quick picks", "contents": [
+                {"videoId": "one", "title": "First", "artists": [{"name": "Artist"}]},
+                {"browseId": "album", "title": "Album"},
+            ]},
+            {"title": "More for you", "contents": [
+                {"videoId": "one", "title": "Duplicate", "artists": [{"name": "Artist"}]},
+                {"videoId": "two", "title": "Second", "artists": [{"name": "Other"}]},
+            ]},
+        ]
+        with patch.dict(sys.modules, {"ytmusicapi": api}):
+            self.assertEqual(home(), [
+                HomeShelf("Quick picks", (Track("one", "First", "Artist"),)),
+                HomeShelf("More for you", (Track("two", "Second", "Other"),)),
+            ])
+        api.YTMusic.return_value.get_home.assert_called_once_with(limit=12)
 
     def test_rejects_invalid_id(self):
         for value in (None, "", "foo/bar", "foo?bar", "x" * 33):

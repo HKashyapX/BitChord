@@ -10,7 +10,7 @@ import sys
 import threading
 import time
 
-from .catalog import Track, build_radio, find_video_version, lookup_metadata, radio, search
+from .catalog import Track, build_radio, find_video_version, home, lookup_metadata, radio, search
 from .downloads import download_audio
 from .lyrics import fetch_from_provider
 from .player import Player, resolve_video
@@ -55,6 +55,17 @@ def main() -> None:
             emit("DONE", request)
         except Exception as exc:
             emit("ERROR", request, encode(str(exc)))
+
+    def do_home(request: str) -> None:
+        try:
+            for shelf in home():
+                for track in shelf.tracks:
+                    emit("HOME_TRACK", request, encode(shelf.title), track.video_id,
+                         encode(track.title), encode(track.artist), encode(track.album),
+                         encode(track.duration), encode(track.artwork_url))
+            emit("HOME_DONE", request)
+        except Exception as exc:
+            emit("HOME_ERROR", request, encode(str(exc)))
 
     def do_lyrics(request: str, title: str, artist: str, duration: int,
                   album: str, provider: str) -> None:
@@ -155,6 +166,8 @@ def main() -> None:
             try:
                 if action == "SEARCH" and len(values) == 1:
                     search_pool.submit(do_search, request, decode(values[0]))
+                elif action == "HOME" and not values:
+                    search_pool.submit(do_home, request)
                 elif action == "LYRICS" and len(values) == 5:
                     lyrics_pool.submit(do_lyrics, request, decode(values[0]),
                                        decode(values[1]), int(values[2]), decode(values[3]), values[4])

@@ -38,6 +38,7 @@ fun main(args: Array<String>) = application {
     val large = "--large" in args
     val narrow = "--narrow" in args
     val search = args.firstOrNull { it.startsWith("--search=") }
+    val samplePreview = listOf("--offline", "--now-playing", "--liked").any { it in args }
     Window(
         onCloseRequest = ::exitApplication,
         title = "BitChord",
@@ -50,7 +51,7 @@ fun main(args: Array<String>) = application {
         DesktopTheme {
             val library = remember { DesktopLibrary.default() }
             val state = remember {
-                DesktopState().apply {
+                DesktopState(samplePreview).apply {
                     restore(library.load())
                     when {
                         "--now-playing" in args -> {
@@ -87,6 +88,7 @@ fun main(args: Array<String>) = application {
                     runCatching {
                         state.audio = DesktopAudio(state)
                         if (state.currentTrack?.let { it in mockTracks } == true) state.setActualPlayback(false)
+                        state.refreshHome()
                     }
                         .onFailure { state.audioError = "Audio helper unavailable: ${it.message}" }
                 }

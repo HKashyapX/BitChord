@@ -27,10 +27,11 @@ Run it from the repository root:
 Configure-on-demand keeps this desktop-only task independent of local Android
 SDK configuration.
 
-Open Search, type a song or artist, then select a result to hear it. Search
-requires internet. Play/pause and next/previous operate on the real results
-in the queue. The Home, Songs, and initial Liked Music tracks remain **sample
-data** and cannot be played; the player explains this when one is selected.
+On a normal launch, Home loads playable guest shelves from YouTube Music. Open
+Search, type a song or artist, then select a result to hear it. Home and Search
+require internet. Play/pause and next/previous operate on those real results in
+the queue. Songs, Liked Music, playlists, and recent searches begin empty on a
+new installation and fill from the user's local desktop activity.
 
 The song actions menu offers like/dislike, play next, add to queue, add to a
 local playlist, a session-only sleep timer for the current song, and open album
@@ -61,19 +62,20 @@ retain placeholders. The
 Lyrics pane tries BetterLyrics followed by LRCLIB, exposes the same manual
 provider choice used by the Android player, highlights the current line, and
 lets you select a line when mpv supports seeking. Provider coverage varies.
-The stream preference control only selects between YouTube formats; Android's
-multi-source quality upgrade has not been ported yet. Sign-in and playback from
-the sample catalog are still pending. The
-underlying Python playback preview remains usable independently.
+The stream preference control only selects between YouTube formats. Android's
+multi-source resolver, candidate validation, and safe stream-swap flow have not
+been ported yet. Sign-in and account-synchronized home/library data are still
+pending. The underlying Python playback preview remains usable independently.
 
-For a UI-only demo without starting Python, run with `--offline`:
+For a UI-only demo with clearly labelled sample content and without starting
+Python, run with `--offline`:
 
 ```sh
 ./gradlew --configure-on-demand :desktopApp:run --args="--offline"
 ```
 
-Follow the flow from Home's Listen again shelf into Liked Music. Selecting a
-track opens Now Playing; its Lyrics and Up next buttons switch the right pane.
+Selecting an offline preview track opens Now Playing; its Lyrics and Up next
+buttons switch the right pane.
 The back arrow returns to the playlist. Search has recent queries and live
 local-catalog results. Selecting any result updates the same player session.
 Lyrics display a labeled unavailable state when the provider has no match.

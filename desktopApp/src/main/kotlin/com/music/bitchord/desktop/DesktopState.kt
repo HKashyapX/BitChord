@@ -38,9 +38,10 @@ internal enum class PlayerPane { MAIN, LYRICS, QUEUE }
 internal enum class RepeatMode { OFF, ALL, ONE }
 internal data class LyricLine(val timeMs: Int, val text: String)
 internal data class OutputDevice(val name: String, val description: String)
+internal data class HomeShelf(val title: String, val tracks: List<MockTrack>)
 
 /** All desktop interactions use one local session; live audio is optional. */
-internal class DesktopState {
+internal class DesktopState(private val sampleMode: Boolean = false) {
     var audio by mutableStateOf<DesktopAudio?>(null)
     var audioError by mutableStateOf<String?>(null)
     var isAudioLoading by mutableStateOf(false)
@@ -107,7 +108,7 @@ internal class DesktopState {
     }
     fun changeQuality(mode: String) {
         val track = currentTrack ?: return
-        if (track in mockTracks || audio == null) return
+        if (isSampleTrack(track) || audio == null) return
         audio?.changeQuality(mode, track)
         qualityMode = mode
         statusMessage = "Stream preference: ${if (mode == "best") "best available" else "standard when available"}"
@@ -118,7 +119,7 @@ internal class DesktopState {
     val downloadingIds = mutableStateListOf<String>()
     val downloadedIds = mutableStateListOf<String>()
     fun startRadio(track: MockTrack) {
-        if (track.id in mockTracks.map { it.id } || audio == null) {
+        if (isSampleTrack(track) || audio == null) {
             statusMessage = "Radio needs a real song and an active audio helper"
             return
         }
@@ -127,7 +128,7 @@ internal class DesktopState {
         audio?.radio(track)
     }
     fun downloadTrack(track: MockTrack) {
-        if (track.id in mockTracks.map { it.id } || audio == null) {
+        if (isSampleTrack(track) || audio == null) {
             statusMessage = "Search for a real song to download"
             return
         }
@@ -180,13 +181,30 @@ internal class DesktopState {
     }
     var searchLoading by mutableStateOf(false)
     var liveResults by mutableStateOf<List<MockTrack>?>(null)
-    val isRealTrack: Boolean get() = currentTrack?.let { it !in mockTracks } == true
+    val homeShelves = mutableStateListOf<HomeShelf>().apply {
+        if (sampleMode) add(HomeShelf("Offline preview", mockTracks))
+    }
+    var homeLoading by mutableStateOf(false)
+    var homeError by mutableStateOf<String?>(null)
+    fun refreshHome() {
+        val helper = audio
+        if (helper == null) {
+            homeLoading = false
+            homeError = if (sampleMode) null else "The music service is unavailable."
+        } else {
+            homeLoading = true
+            homeError = null
+            helper.loadHome()
+        }
+    }
+    private fun isSampleTrack(track: MockTrack) = sampleMode && mockTracks.any { it.id == track.id }
+    val isRealTrack: Boolean get() = currentTrack?.let { !isSampleTrack(it) } == true
     fun setActualPlayback(playing: Boolean) { isPlaying = playing }
     var destination by mutableStateOf(Destination.HOME)
         private set
     private val backStack = mutableStateListOf<Destination>()
 
-    val queue = mutableStateListOf<MockTrack>().apply { addAll(mockTracks) }
+    val queue = mutableStateListOf<MockTrack>().apply { if (sampleMode) addAll(mockTracks) }
     var currentIndex by mutableIntStateOf(0)
         private set
     val currentTrack: MockTrack? get() = queue.getOrNull(currentIndex)
@@ -210,11 +228,13 @@ internal class DesktopState {
         private set
     var selectedPlaylist by mutableStateOf<String?>(null)
         private set
-    val playlists = mutableStateMapOf("Desktop Mix" to listOf<MockTrack>())
+    val playlists = mutableStateMapOf<String, List<MockTrack>>()
 
-    val likedIds = mutableStateListOf("midnight", "less", "after", "space", "chamber")
+    val likedIds = mutableStateListOf<String>().apply {
+        if (sampleMode) addAll(listOf("midnight", "less", "after", "space", "chamber"))
+    }
     val dislikedIds = mutableStateListOf<String>()
-    val knownTracks = mutableStateListOf<MockTrack>().apply { addAll(mockTracks) }
+    val knownTracks = mutableStateListOf<MockTrack>().apply { if (sampleMode) addAll(mockTracks) }
     val likedTracks: List<MockTrack> get() = knownTracks.filter { it.id in likedIds }
     fun rememberTracks(tracks: List<MockTrack>) {
         tracks.forEach { track ->
@@ -250,7 +270,6 @@ internal class DesktopState {
         saved.playlists.forEach { (name, ids) ->
             playlists[name] = ids.mapNotNull(tracksById::get).distinctBy { it.id }
         }
-        if (playlists.isEmpty()) playlists["Desktop Mix"] = emptyList()
         val restoredQueue = saved.queueIds.mapNotNull(tracksById::get)
         if (restoredQueue.isNotEmpty()) {
             queue.clear(); queue.addAll(restoredQueue)
@@ -260,15 +279,17 @@ internal class DesktopState {
         shuffleEnabled = saved.shuffleEnabled
         isPlaying = false // Never start audio from a restored session.
     }
-    val recentSearches = mutableStateListOf("M83", "Beach House")
+    val recentSearches = mutableStateListOf<String>().apply {
+        if (sampleMode) addAll(listOf("M83", "Beach House"))
+    }
     var searchQuery by mutableStateOf("")
     val searchResults: List<MockTrack> get() {
         val term = searchQuery.trim()
-        return if (term.isBlank()) emptyList() else liveResults ?: mockTracks.filter {
+        return if (term.isBlank()) emptyList() else liveResults ?: if (sampleMode) mockTracks.filter {
             it.title.contains(term, ignoreCase = true) ||
                 it.artist.contains(term, ignoreCase = true) ||
                 it.album.contains(term, ignoreCase = true)
-        }
+        } else emptyList()
     }
 
     fun navigate(to: Destination) {
@@ -295,7 +316,7 @@ internal class DesktopState {
         progress = 0f
         isPlaying = audio == null
         if (audio != null) {
-            if (track in mockTracks) {
+            if (isSampleTrack(track)) {
                 audio?.stop()
                 audioError = "Sample track: search for a real song to play audio."
             }
@@ -316,7 +337,7 @@ internal class DesktopState {
         isPlaying = audio == null
         if (audio != null) {
             val track = currentTrack
-            if (track != null && track !in mockTracks) audio?.play(track)
+            if (track != null && !isSampleTrack(track)) audio?.play(track)
             else {
                 audio?.stop()
                 audioError = "Sample track: search for a real song to play audio."
@@ -394,7 +415,7 @@ internal class DesktopState {
 
     private fun restartAudio() {
         val track = currentTrack
-        if (track != null && track !in mockTracks) audio?.play(track)
+        if (track != null && !isSampleTrack(track)) audio?.play(track)
         else { audio?.stop(); isPlaying = false; audioError = "Sample track: search for a real song to play audio." }
     }
 

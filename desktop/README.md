@@ -1,10 +1,9 @@
 # BitChord for Linux (early preview)
 
-This is the first independent desktop client in the BitChord fork. It searches
-YouTube Music songs, plays selected tracks, and supports a visible queue with
-automatic advance, removal, pause/resume, next, and stop controls. It does not
-yet provide Google sign-in, a synchronized library, seeking, downloads, lyrics,
-or feature parity with the Android app.
+This is the local Python service used by the independent desktop client. It
+loads a guest YouTube Music home feed, searches songs, resolves playback, and
+supports the Compose client's queue, downloads, lyrics, radio, and player
+controls. Google sign-in and a synchronized account library are not available.
 
 ## Run
 
@@ -28,7 +27,7 @@ stored by this preview.
 
 If a song stops unexpectedly, try another result and check that `ffplay` runs
 on your system. Stream extraction errors appear below the player controls.
-The preview has no seek bar or automatic recommendations yet.
+The standalone Tk preview remains intentionally smaller than the Compose app.
 
 Run the dependency-free unit tests with:
 

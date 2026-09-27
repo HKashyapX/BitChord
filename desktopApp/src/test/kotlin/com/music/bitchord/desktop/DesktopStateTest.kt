@@ -8,6 +8,14 @@ import androidx.compose.ui.graphics.Color
 
 class DesktopStateTest {
     @Test
+    fun productionStateStartsWithoutSampleTracks() {
+        val state = DesktopState()
+        assertTrue(state.queue.isEmpty())
+        assertTrue(state.knownTracks.isEmpty())
+        assertTrue(state.likedTracks.isEmpty())
+        assertTrue(state.recentSearches.isEmpty())
+    }
+    @Test
     fun musicArtworkRequestsLargerCoverAndKeepsOriginalFallback() {
         val track = MockTrack("abc123", "Song", "Artist", "Album", 180,
             Color.Black, Color.DarkGray,
@@ -18,7 +26,7 @@ class DesktopStateTest {
     }
     @Test
     fun lyricsOffsetIsBounded() {
-        val state = DesktopState()
+        val state = DesktopState(true)
         state.adjustLyricsOffset(500)
         assertEquals(500, state.lyricsOffsetMs)
         state.adjustLyricsOffset(100_000)
@@ -26,7 +34,7 @@ class DesktopStateTest {
     }
     @Test
     fun refreshedSearchTrackUpdatesOldQueueArtwork() {
-        val state = DesktopState()
+        val state = DesktopState(true)
         val old = MockTrack("abc123", "Song", "Artist", "Album", 180,
             Color.Black, Color.DarkGray)
         state.rememberTracks(listOf(old))
@@ -40,7 +48,7 @@ class DesktopStateTest {
     }
     @Test
     fun sleepTimerStopsPlaybackAtDeadline() {
-        val state = DesktopState()
+        val state = DesktopState(true)
         state.selectTrack(mockTracks[0], mockTracks, "Test")
         state.setSleepTimer(15, nowMillis = 1_000L)
         state.checkSleepTimer(nowMillis = 900_000L)
@@ -51,7 +59,7 @@ class DesktopStateTest {
     }
     @Test
     fun playlistSelectionSharesPlayerAndBackDestination() {
-        val state = DesktopState()
+        val state = DesktopState(true)
         state.navigate(Destination.LIKED_MUSIC)
         val liked = state.likedTracks
         state.selectTrack(liked[1], liked, "Liked Music")
@@ -82,7 +90,7 @@ class DesktopStateTest {
 
     @Test
     fun queueLikeAndSearchRemainInOneSession() {
-        val state = DesktopState()
+        val state = DesktopState(true)
         val track = mockTracks.last()
         state.addToQueue(track)
         assertEquals(track, state.queue.last())
@@ -108,7 +116,7 @@ class DesktopStateTest {
 
     @Test
     fun playNextReorderAndRepeatKeepQueueConsistent() {
-        val state = DesktopState()
+        val state = DesktopState(true)
         val tracks = mockTracks.take(4)
         state.selectTrack(tracks[0], tracks, "Songs")
         state.playNext(mockTracks[7])
@@ -137,7 +145,7 @@ class DesktopStateTest {
 
     @Test
     fun actionsPlaylistAndDetailsUseKnownTracks() {
-        val state = DesktopState()
+        val state = DesktopState(true)
         val track = mockTracks[1]
         state.openActions(track)
         assertEquals(track, state.actionTrack)

@@ -68,7 +68,7 @@ internal fun Sidebar(state: DesktopState) {
         SidebarItem("Songs", Icons.Default.LibraryMusic, state.destination == Destination.SONGS) { state.navigate(Destination.SONGS) }
         SidebarItem("Playlists", Icons.Default.QueueMusic, state.destination == Destination.PLAYLISTS || state.destination == Destination.PLAYLIST) { state.navigate(Destination.PLAYLISTS) }
         Spacer(Modifier.weight(1f))
-        Text("Desktop preview · local data", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(8.dp))
+        Text("YouTube Music · local library", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(8.dp))
     }
 }
 
@@ -176,13 +176,18 @@ internal fun BottomPlayer(state: DesktopState) {
 
 @Composable
 internal fun SongsScreen(state: DesktopState) {
+    val tracks = state.knownTracks.filter { known -> mockTracks.none { it.id == known.id } }
     Column(Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 24.dp)) {
         Text("Songs", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
-        Text("${mockTracks.size} songs", color = Muted, fontSize = 12.sp)
+        Text("${tracks.size} songs", color = Muted, fontSize = 12.sp)
         Spacer(Modifier.height(18.dp))
         HorizontalDivider(color = Stroke)
         LazyColumn(contentPadding = PaddingValues(bottom = 20.dp)) {
-            itemsIndexed(mockTracks) { _, track -> DesktopTrackRow(track, state, mockTracks, "Songs", showLike = true) }
+            if (tracks.isEmpty()) {
+                item { Text("Songs you play will appear here.", color = Muted, fontSize = 13.sp, modifier = Modifier.padding(vertical = 18.dp)) }
+            } else {
+                itemsIndexed(tracks) { _, track -> DesktopTrackRow(track, state, tracks, "Songs", showLike = true) }
+            }
         }
     }
 }
