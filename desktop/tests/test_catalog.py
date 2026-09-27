@@ -4,7 +4,7 @@ from unittest.mock import patch
 from unittest.mock import MagicMock
 import sys
 
-from bitchord_desktop.catalog import Track, parse_track, lookup_artwork, radio
+from bitchord_desktop.catalog import Track, parse_track, lookup_artwork, lookup_metadata, radio
 
 
 class CatalogTests(unittest.TestCase):
@@ -34,6 +34,8 @@ class CatalogTests(unittest.TestCase):
         search.return_value = [Track("other", "Song", "Artist", artwork_url="https://i.ytimg.com/wrong.jpg"),
                                Track("right", "Song", "Artist", artwork_url="https://i.ytimg.com/right.jpg")]
         self.assertEqual(lookup_artwork("right", "Song", "Artist"), "https://i.ytimg.com/right.jpg")
+        self.assertEqual(lookup_metadata("right", "Song", "Artist").artwork_url,
+                         "https://i.ytimg.com/right.jpg")
 
     def test_radio_parses_watch_playlist(self):
         api = MagicMock()

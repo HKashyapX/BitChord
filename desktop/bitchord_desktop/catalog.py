@@ -67,6 +67,11 @@ def lookup_artwork(video_id: str, title: str, artist: str) -> str:
     return ""
 
 
+def lookup_metadata(video_id: str, title: str, artist: str) -> Track | None:
+    """Refresh artwork and album only for the same song ID."""
+    return next((track for track in search(f"{title} {artist}") if track.video_id == video_id), None)
+
+
 def radio(video_id: str) -> list[Track]:
     from ytmusicapi import YTMusic
 

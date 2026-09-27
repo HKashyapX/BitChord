@@ -21,6 +21,7 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
     private val writer = process.outputStream.bufferedWriter()
     private var searchId = 0
     private var playbackId = 0
+    private var pendingQualitySeek: Float? = null
     private var requestId = 0
     private val pending = mutableMapOf<Int, MutableList<MockTrack>>()
     private val pendingLyrics = mutableMapOf<Int, MutableList<LyricLine>>()
@@ -77,9 +78,7 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
         pendingLyrics[id] = mutableListOf()
         send("PLAY", id.toString(), track.id)
         send("LYRICS", id.toString(), encode(track.title), encode(track.artist), track.durationSeconds.toString())
-        if (track.artworkUrl.isBlank()) {
-            send("ARTWORK_LOOKUP", id.toString(), track.id, encode(track.title), encode(track.artist))
-        }
+        send("ARTWORK_LOOKUP", id.toString(), track.id, encode(track.title), encode(track.artist))
     }
 
     fun pause() = send("PAUSE", playbackId.toString())
@@ -87,6 +86,14 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
     fun queryOutputs() = send("OUTPUTS", playbackId.toString())
     fun setVolume(value: Float) = send("VOLUME", playbackId.toString(), value.toString())
     fun selectOutput(name: String) = send("OUTPUT_SELECT", playbackId.toString(), encode(name))
+    fun queryPipeline() = send("PIPELINE", playbackId.toString())
+    fun changeQuality(mode: String, track: MockTrack) {
+        if (mode !in setOf("standard", "best")) return
+        val position = track.durationSeconds * state.progress
+        pendingQualitySeek = position.takeIf { state.audioSeekAvailable && it > 0f }
+        send("QUALITY", playbackId.toString(), mode)
+        if (state.audioStreamActive) play(track)
+    }
     fun radio(track: MockTrack) {
         val id = ++requestId
         pendingRadio.clear(); radioSeeds.clear()
@@ -152,6 +159,20 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
                 state.audioStreamActive = true
                 state.audioSeekAvailable = fields.getOrNull(2) == "seek"
                 state.setActualPlayback(true)
+                pendingQualitySeek?.let { seconds ->
+                    if (state.audioSeekAvailable) seek(seconds)
+                    pendingQualitySeek = null
+                }
+            }
+            "QUALITY_SET" -> if (id == playbackId) state.qualityMode = fields.getOrNull(2).orEmpty()
+            "QUALITY_ERROR" -> if (id == playbackId) state.statusMessage = fields.getOrNull(2)?.let(::decode)
+            "PIPELINE_FIELD" -> if (id == playbackId && fields.size >= 4) {
+                state.pipelineFields[decode(fields[2])] = decode(fields[3])
+            }
+            "PIPELINE_DONE" -> if (id == playbackId) state.pipelineLoading = false
+            "PIPELINE_ERROR" -> if (id == playbackId) {
+                state.pipelineLoading = false
+                state.pipelineError = fields.getOrNull(2)?.let(::decode)
             }
             "POSITION" -> if (id == playbackId) fields.getOrNull(2)?.toFloatOrNull()?.let(state::updatePosition)
             "OUTPUT" -> if (id == playbackId && fields.size >= 4) {
@@ -168,10 +189,15 @@ internal class DesktopAudio(private val state: DesktopState) : AutoCloseable {
                 state.outputLoading = false
                 state.outputError = fields.getOrNull(2)?.let(::decode)
             }
-            "ARTWORK" -> if (id == playbackId) {
+            "METADATA" -> if (id == playbackId) {
                 val track = state.currentTrack
-                val url = fields.getOrNull(2)?.let(::decode).orEmpty()
-                if (track != null && url.isNotBlank()) state.rememberTracks(listOf(track.copy(artworkUrl = url)))
+                val album = fields.getOrNull(2)?.let(::decode).orEmpty()
+                val url = fields.getOrNull(3)?.let(::decode).orEmpty()
+                if (track != null && (album.isNotBlank() || url.isNotBlank())) {
+                    state.rememberTracks(listOf(track.copy(
+                        album = album.ifBlank { track.album }, artworkUrl = url.ifBlank { track.artworkUrl }
+                    )))
+                }
             }
             "LYRIC" -> if (id == playbackId && fields.size >= 4) {
                 val time = fields[2].toIntOrNull()

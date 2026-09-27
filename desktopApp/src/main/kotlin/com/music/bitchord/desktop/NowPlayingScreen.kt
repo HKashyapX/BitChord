@@ -208,6 +208,9 @@ private fun MainControls(state: DesktopState) {
         TextButton(onClick = state::openOutput, enabled = state.isRealTrack) {
             Text("Audio output · ${state.outputSelected}", color = Muted, fontSize = 12.sp)
         }
+        TextButton(onClick = state::openPipeline, enabled = state.isRealTrack) {
+            Text("Audio quality · ${if (state.qualityMode == "best") "best available" else "standard"}", color = Muted, fontSize = 12.sp)
+        }
         state.statusMessage?.let { Text(it, color = Muted, fontSize = 11.sp) }
     }
 }

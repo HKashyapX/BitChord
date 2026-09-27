@@ -10,7 +10,7 @@ import sys
 import threading
 import time
 
-from .catalog import Track, lookup_artwork, radio, search
+from .catalog import Track, lookup_metadata, radio, search
 from .downloads import download_audio
 from .lyrics import fetch_lyrics
 from .player import Player
@@ -66,9 +66,9 @@ def main() -> None:
 
     def do_artwork(request: str, track_id: str, title: str, artist: str) -> None:
         try:
-            artwork = lookup_artwork(track_id, title, artist)
-            if artwork:
-                emit("ARTWORK", request, encode(artwork))
+            track = lookup_metadata(track_id, title, artist)
+            if track:
+                emit("METADATA", request, encode(track.album), encode(track.artwork_url))
         except Exception:
             # Artwork is optional; a failed lookup must not interrupt audio.
             pass
@@ -199,6 +199,19 @@ def main() -> None:
                         emit("OUTPUT_SELECTED", request, encode(device))
                     except (ValueError, RuntimeError, OSError) as exc:
                         emit("OUTPUT_ERROR", request, encode(str(exc)))
+                elif action == "QUALITY" and len(values) == 1:
+                    try:
+                        player.set_quality(values[0])
+                        emit("QUALITY_SET", request, values[0])
+                    except ValueError as exc:
+                        emit("QUALITY_ERROR", request, encode(str(exc)))
+                elif action == "PIPELINE":
+                    try:
+                        for key, value in player.pipeline().items():
+                            emit("PIPELINE_FIELD", request, encode(key), encode(value))
+                        emit("PIPELINE_DONE", request)
+                    except (ValueError, RuntimeError, OSError) as exc:
+                        emit("PIPELINE_ERROR", request, encode(str(exc)))
                 elif action == "STOP":
                     with playback_lock:
                         playback_serial += 1

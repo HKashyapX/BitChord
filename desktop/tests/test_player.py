@@ -119,6 +119,22 @@ class PlayerTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 player.set_output("unknown")
 
+    def test_quality_preference_and_pipeline_report_actual_audio_parameters(self):
+        player = Player()
+        with self.assertRaises(ValueError):
+            player.set_quality("lossless")
+        player.set_quality("standard")
+        player.backend = "mpv"
+        with patch.object(player, "_command_locked", side_effect=[
+            "opus", {"samplerate": 48000, "channels": "stereo", "format": "float"},
+            {"samplerate": 48000, "channels": "stereo", "format": "s16"},
+        ]):
+            details = player.pipeline()
+        self.assertEqual(details["Codec"], "opus")
+        self.assertIn("samplerate: 48000", details["Input"])
+        self.assertIn("format: s16", details["Output"])
+        self.assertEqual(details["Preference"], "Standard when available")
+
 
 if __name__ == "__main__":
     unittest.main()
