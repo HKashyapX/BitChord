@@ -95,9 +95,13 @@ private fun trimVideoLetterbox(bytes: ByteArray): ByteArray {
 
 internal fun artworkCandidates(track: MockTrack?): List<String> {
     if (track == null || mockTracks.any { it.id == track.id }) return emptyList()
+    val original = track.artworkUrl.takeIf { it.isNotBlank() }
+    val large = original?.takeIf {
+        runCatching { URI(it).host == "lh3.googleusercontent.com" }.getOrDefault(false)
+    }?.replace(Regex("=w[0-9]+-h[0-9]+"), "=w720-h720")?.takeIf { it != original }
     val fallback = track.id.takeIf { it.matches(Regex("[A-Za-z0-9_-]{1,32}")) }
         ?.let { "https://i.ytimg.com/vi/$it/hqdefault.jpg" }
-    return listOfNotNull(track.artworkUrl.takeIf { it.isNotBlank() }, fallback).distinct()
+    return listOfNotNull(large, original, fallback).distinct()
 }
 
 private fun loadCover(url: String): ImageBitmap? {

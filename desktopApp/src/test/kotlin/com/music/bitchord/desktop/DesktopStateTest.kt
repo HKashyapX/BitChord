@@ -8,6 +8,15 @@ import androidx.compose.ui.graphics.Color
 
 class DesktopStateTest {
     @Test
+    fun musicArtworkRequestsLargerCoverAndKeepsOriginalFallback() {
+        val track = MockTrack("abc123", "Song", "Artist", "Album", 180,
+            Color.Black, Color.DarkGray,
+            "https://lh3.googleusercontent.com/example=w120-h120-l90-rj")
+        val candidates = artworkCandidates(track)
+        assertEquals("https://lh3.googleusercontent.com/example=w720-h720-l90-rj", candidates.first())
+        assertEquals(track.artworkUrl, candidates[1])
+    }
+    @Test
     fun lyricsOffsetIsBounded() {
         val state = DesktopState()
         state.adjustLyricsOffset(500)
