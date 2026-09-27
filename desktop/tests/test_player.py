@@ -35,6 +35,18 @@ class PlayerTests(unittest.TestCase):
         player.stop()
 
     @patch("bitchord_desktop.player.subprocess.Popen")
+    @patch("bitchord_desktop.player.resolve_video", return_value=("https://example.com/video", {}))
+    @patch("bitchord_desktop.player.shutil.which", return_value="/usr/bin/mpv")
+    def test_video_version_opens_mpv_video_window(self, _which, _resolve, popen):
+        player = Player()
+        player.play(Track("abc", "Song", "Artist"), video=True)
+        command = popen.call_args.args[0]
+        self.assertEqual(command[0], "mpv")
+        self.assertNotIn("--no-video", command)
+        self.assertEqual(command[-1], "https://example.com/video")
+        player.stop()
+
+    @patch("bitchord_desktop.player.subprocess.Popen")
     @patch("bitchord_desktop.player.resolve_stream")
     @patch("bitchord_desktop.player.saved_audio", return_value=__import__("pathlib").Path("/tmp/song.webm"))
     @patch("bitchord_desktop.player.shutil.which", side_effect=lambda name: None if name == "mpv" else "/usr/bin/ffplay")

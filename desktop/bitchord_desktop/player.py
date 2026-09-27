@@ -44,6 +44,29 @@ def resolve_stream(video_id: str, quality: str = "best") -> tuple[str, dict[str,
     return url, safe_headers
 
 
+def resolve_video(video_id: str) -> tuple[str, dict[str, str]]:
+    from yt_dlp import YoutubeDL
+    from yt_dlp.utils import DownloadError
+
+    try:
+        with YoutubeDL({"format": "best[height<=1080]/best", "quiet": True, "no_warnings": True,
+                        "noplaylist": True, "socket_timeout": 10,
+                        "retries": 1, "extractor_retries": 1}) as dl:
+            info = dl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+    except DownloadError as exc:
+        raise RuntimeError(f"Could not load the video: {exc}") from exc
+    if not isinstance(info, dict) or not isinstance(info.get("url"), str):
+        raise RuntimeError("No playable video stream was returned")
+    url = info["url"]
+    if urlparse(url).scheme != "https":
+        raise RuntimeError("No HTTPS video stream was returned")
+    headers = info.get("http_headers") or {}
+    return url, {key: value for key, value in headers.items()
+                 if isinstance(key, str) and isinstance(value, str)
+                 and key.lower() in {"user-agent", "referer", "origin"}
+                 and "\r" not in value and "\n" not in value}
+
+
 class Player:
     def __init__(self) -> None:
         self.process: subprocess.Popen | None = None
@@ -59,15 +82,20 @@ class Player:
     def supports_seek(self) -> bool:
         return self.backend == "mpv"
 
-    def play(self, track: Track) -> None:
+    def play(self, track: Track, video: bool = False,
+             resolved: tuple[str, dict[str, str]] | None = None) -> None:
         backend = "mpv" if shutil.which("mpv") else "ffplay"
+        if video and backend != "mpv":
+            raise RuntimeError("Install mpv to play a video version")
         if not shutil.which(backend):
             raise RuntimeError("Install mpv (recommended) or ffplay with your Linux package manager.")
-        local = saved_audio(track.video_id)
+        local = None if video or resolved is not None else saved_audio(track.video_id)
         if local is not None:
             url, headers = str(local), {}
+        elif resolved is not None:
+            url, headers = resolved
         else:
-            url, headers = resolve_stream(track.video_id, self.quality)
+            url, headers = resolve_video(track.video_id) if video else resolve_stream(track.video_id, self.quality)
         with self._lock:
             if self._closed:
                 return
@@ -77,7 +105,10 @@ class Player:
             if backend == "mpv":
                 self._ipc_dir = tempfile.mkdtemp(prefix="bitchord-mpv-")
                 socket_path = os.path.join(self._ipc_dir, "ipc")
-                command = ["mpv", "--no-config", "--no-video", "--terminal=no",
+                command = ["mpv", "--no-config", "--terminal=no"]
+                if not video:
+                    command.append("--no-video")
+                command += [
                            f"--input-ipc-server={socket_path}"]
                 lower_headers = {key.lower(): value for key, value in headers.items()}
                 if "user-agent" in lower_headers:

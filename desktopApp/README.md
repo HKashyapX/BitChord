@@ -46,7 +46,11 @@ or a diagnostic log, while the Lyrics pane has a line timing offset. With mpv,
 the Audio output dialog lists available devices and controls player volume.
 Real tracks can be downloaded to `$XDG_DATA_HOME/bitchord/downloads` (or
 `~/.local/share/bitchord/downloads`) and played from there on future selections.
-Start radio builds a fresh queue from YouTube Music's watch radio response.
+Start radio builds a fresh queue from YouTube Music's watch radio response,
+using the Android client's title/artist matching to remove duplicate audio and
+video cuts and to limit runs from one artist. A real playing track can switch
+to a matching music-video version in an mpv window and return to its original
+audio version from the song actions menu.
 Real search results advance to the next queued track when audio ends. With
 `mpv`, the player reports elapsed time and supports seeking. With only `ffplay`,
 the real-track seek control stays disabled and elapsed time is unavailable.
@@ -54,9 +58,12 @@ Real search tracks show the largest provider artwork when available. Older saved
 tracks refresh their artwork when played; if the provider has no matching music
 cover, the video thumbnail is cropped and shown at a bounded size. Sample tracks
 retain placeholders. The
-Lyrics pane tries LRCLIB for line-synchronized lyrics, highlights
-the current line, and lets you select a line when mpv supports seeking. Provider
-coverage varies. Sign-in and playback from the sample catalog are still pending. The
+Lyrics pane tries BetterLyrics followed by LRCLIB, exposes the same manual
+provider choice used by the Android player, highlights the current line, and
+lets you select a line when mpv supports seeking. Provider coverage varies.
+The stream preference control only selects between YouTube formats; Android's
+multi-source quality upgrade has not been ported yet. Sign-in and playback from
+the sample catalog are still pending. The
 underlying Python playback preview remains usable independently.
 
 For a UI-only demo without starting Python, run with `--offline`:

@@ -54,7 +54,12 @@ internal fun SongActionsDialog(state: DesktopState, track: MockTrack) {
                 ActionLine("Copy playback log") { state.copyPlaybackLog(track); state.closeActions() }
                 if (track.id == state.currentTrack?.id) {
                     if (state.isRealTrack) {
-                        ActionLine("Upgrade quality / audio pipeline") { state.closeActions(); state.openPipeline() }
+                        ActionLine(when {
+                            state.versionSwitchLoading -> "Switching version…"
+                            state.videoVersionActive -> "Convert to audio"
+                            else -> "Convert to video"
+                        }) { if (!state.versionSwitchLoading) state.toggleVideoVersion(); state.closeActions() }
+                        ActionLine("Stream preference / audio pipeline") { state.closeActions(); state.openPipeline() }
                     }
                     ActionLine("Sleep timer · 15 minutes") { state.setSleepTimer(15); state.closeActions() }
                     ActionLine("Sleep timer · 30 minutes") { state.setSleepTimer(30); state.closeActions() }

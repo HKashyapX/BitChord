@@ -228,8 +228,11 @@ private fun LyricsPane(state: DesktopState) {
     }
     Column(Modifier.fillMaxWidth().height(390.dp)) {
         Text(track.title, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-        Text(if (state.lyricsSource.isNotEmpty()) "Lyrics by ${state.lyricsSource}" else "Lyrics",
-            color = Muted, fontSize = 12.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(if (state.lyricsSource.isNotEmpty()) "Lyrics by ${state.lyricsSource}" else "Lyrics",
+                color = Muted, fontSize = 12.sp)
+            TextButton(onClick = { state.lyricsProviderDialogOpen = true }) { Text("Change") }
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = { state.adjustLyricsOffset(-500) }) { Text("−0.5s") }
             Text("Offset ${state.lyricsOffsetMs / 1000f}s", color = Muted, fontSize = 11.sp)

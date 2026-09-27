@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.dp
 internal fun AudioPipelineDialog(state: DesktopState) {
     AlertDialog(
         onDismissRequest = { state.pipelineDialogOpen = false },
-        title = { Text("Audio quality and pipeline") },
+        title = { Text("Stream preference and pipeline") },
         text = {
             Column {
                 Text("Choose a stream preference. The provider may offer the same format for both choices.")
